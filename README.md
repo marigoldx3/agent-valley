@@ -46,7 +46,7 @@ Add a service to the Hermes stack's compose so it shares the network with `herme
 ```yaml
   hermes-valley:
     build:
-      context: https://github.com/marigoldx3/hermes-valley.git#main
+      context: https://github.com/marigoldx3/agent-valley.git#main
     pull_policy: build
     environment:
       - SERVICE_FQDN_HERMESVALLEY_8080
