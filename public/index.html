@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#5b2d0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Valley">
+<title>Hermes Valley</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="office.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<div id="boot" class="boot">Loading the valley…</div>
+
+<section id="login" class="login" hidden>
+  <canvas id="title-canvas" class="title-canvas" aria-hidden="true"></canvas>
+  <div class="login-inner">
+    <h1 class="logo"><span>Hermes</span><span>Valley</span></h1>
+    <form id="login-form" class="frame login-box">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="login-btn" class="btn btn-go" type="submit">Enter the valley</button>
+      <p id="login-error" class="login-error" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<main id="app" class="app office-normal" hidden>
+  <section id="office-wrap" class="office-wrap">
+    <div id="office-stage" class="office-stage">
+      <canvas id="office" aria-label="The office, with one character per agent"></canvas>
+      <div id="office-tags" class="office-tags"></div>
+    </div>
+  </section>
+  <div class="hud">
+    <div class="clock frame-mini" aria-live="off">
+      <div class="clock-date" id="clock-date"></div>
+      <div class="clock-time"><span id="clock-icon"></span> <span id="clock-time"></span></div>
+      <div class="clock-gold" id="clock-gold"></div>
+    </div>
+  </div>
+  <button id="office-toggle" class="icon-btn office-toggle" type="button" aria-label="Resize the office">⤢</button>
+
+  <section class="chat" aria-label="Chat with Hermes">
+    <header class="chat-head">
+      <span class="portrait-frame-sm"><canvas id="chat-portrait" class="pix"></canvas></span>
+      <div class="chat-title">
+        <strong>Hermes</strong>
+        <span id="chat-status">at the desk</span>
+      </div>
+      <button id="btn-journal" class="icon-btn" type="button" aria-label="Past chats">📜</button>
+      <button id="btn-new" class="icon-btn" type="button" aria-label="New chat">🌱</button>
+    </header>
+    <div id="messages" class="messages"></div>
+    <form id="composer" class="composer">
+      <textarea id="input" rows="1" placeholder="Say something to Hermes…" enterkeyhint="send" aria-label="Message"></textarea>
+      <button id="send" class="btn btn-go send" type="submit" aria-label="Send">➤</button>
+    </form>
+  </section>
+</main>
+
+<div id="backdrop" class="backdrop" hidden></div>
+
+<section id="agent-card" class="dialog frame" role="dialog" aria-modal="true" aria-labelledby="card-name" hidden>
+  <button class="close-x" type="button" data-close aria-label="Close">✕</button>
+  <div class="card-body">
+    <div class="card-text">
+      <p id="card-greet" class="card-greet"></p>
+      <dl id="card-facts" class="facts"></dl>
+      <p id="card-prompt" class="card-prompt"></p>
+      <div id="card-report" class="card-report md" hidden></div>
+      <div id="card-actions" class="card-actions"></div>
+    </div>
+    <div class="card-side">
+      <div class="portrait-frame"><canvas id="card-portrait" class="pix"></canvas></div>
+      <div id="card-name" class="name-plate"></div>
+    </div>
+  </div>
+</section>
+
+<section id="journal" class="drawer frame" role="dialog" aria-modal="true" aria-labelledby="journal-title" hidden>
+  <button class="close-x" type="button" data-close aria-label="Close">✕</button>
+  <h2 id="journal-title" class="drawer-title">Journal</h2>
+  <div id="journal-list" class="journal-list"></div>
+  <button id="btn-logout" class="btn btn-quiet" type="button">Leave the valley (log out)</button>
+</section>
+
+<section id="approval" class="dialog frame" role="alertdialog" aria-modal="true" aria-labelledby="approval-title" hidden>
+  <div class="card-body">
+    <div class="card-text">
+      <p id="approval-title" class="card-greet">Hermes wants to do something that needs your OK:</p>
+      <pre id="approval-cmd" class="approval-cmd"></pre>
+      <div class="card-actions">
+        <button class="btn btn-go" type="button" data-choice="once">Allow once</button>
+        <button class="btn" type="button" data-choice="session">Allow for this chat</button>
+        <button class="btn btn-stop" type="button" data-choice="deny">Deny</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>
