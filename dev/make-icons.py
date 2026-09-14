@@ -1,43 +1,38 @@
 #!/usr/bin/env python3
-"""Draw the Hermes Valley app icons (pixel Hermes on a sky tile) as PNGs. No dependencies."""
+"""Draw the Marigold Valley app icons (a pixel marigold on a sky tile) as PNGs. No dependencies."""
+import math
 import pathlib
 import struct
 import zlib
 
 PUBLIC = pathlib.Path(__file__).resolve().parent.parent / "public"
 
-# Same left-half templates as public/office.js (mirrored to 12 columns).
-BODY = ["......", "...ooo", "..osss", ".ossss", ".ossss", ".ossss", ".ossss", "..osss",
-        "..otts", ".otttt", "otTttt", "otTttt", "ostttt", ".okkkk"]
-HELM = ["w...gg", "ww.ggg", "wwgggg", ".wgggg", ".ohhhh", ".oh..."]
-COLORS = {
-    "o": "#3b1f0e", "s": "#f7d3ad", "h": "#e0b04a", "t": "#3a6fd8", "T": "#2d56a8",
-    "k": "#f2c14e", "g": "#f2c14e", "w": "#ffffff",
-}
-
 
 def rgb(hex_color):
     return tuple(int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
 
 
-def mirror(half):
-    return half + half[::-1]
-
-
 def tile():
-    """16x16 grid of RGB tuples."""
-    grid = [[rgb("#7ec8f0") if y < 11 else rgb("#5ba044") for x in range(16)] for y in range(16)]
+    """16x16 grid of RGB tuples: sky, grass, a marigold on a stem."""
+    grid = [[rgb("#7ec8f0") if y < 12 else rgb("#5ba044") for x in range(16)] for y in range(16)]
     for x in range(16):
-        grid[11][x] = rgb("#8fd16a")
-    for x, y in ((3, 3), (4, 3), (5, 3), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4), (11, 2), (12, 2), (10, 3), (11, 3), (12, 3), (13, 3)):
+        grid[12][x] = rgb("#8fd16a")
+    for x, y in ((1, 2), (2, 2), (3, 2), (0, 3), (1, 3), (2, 3), (3, 3), (4, 3), (12, 1), (13, 1), (11, 2), (12, 2), (13, 2), (14, 2)):
         grid[y][x] = rgb("#ffffff")
-    for rows in (BODY, HELM):
-        for j, half in enumerate(rows):
-            for i, ch in enumerate(mirror(half)):
-                if ch in COLORS:
-                    grid[j + 2][i + 2] = rgb(COLORS[ch])
-    for x, y, c in ((6, 7, "#2a1a10"), (9, 7, "#2a1a10"), (5, 8, "#f3907c"), (10, 8, "#f3907c")):
-        grid[y][x] = rgb(c)
+    for y in range(9, 14):  # stem
+        grid[y][8] = rgb("#3a7a35")
+    for x, y in ((9, 11), (10, 11), (10, 10), (6, 12), (7, 12)):  # leaves
+        grid[y][x] = rgb("#3a7a35")
+    cx, cy = 7.5, 5.5
+    for y in range(16):
+        for x in range(16):
+            d = math.hypot(x - cx, y - cy)
+            if d < 1.3:
+                grid[y][x] = rgb("#b8451a")
+            elif d < 4.6:
+                ruffle = (x * 3 + y * 5) % 4 == 0
+                edge = d > 3.8
+                grid[y][x] = rgb("#ffcf3f" if ruffle and not edge else "#d9761a" if edge else "#f5a01f")
     return grid
 
 

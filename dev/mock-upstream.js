@@ -1,7 +1,7 @@
 'use strict';
 // Fake Hermes WebUI API for local development. Password: valley
 //   node dev/mock-upstream.js
-//   HERMES_UPSTREAM=http://127.0.0.1:8799 node server.js
+//   HERMES_UPSTREAM=http://127.0.0.1:8799 DATA_DIR=dev/data node server.js
 const http = require('node:http');
 const crypto = require('node:crypto');
 
@@ -11,25 +11,44 @@ const TOKEN = 'hermes_session=mock-ok';
 const iso = (msAgo = 0) => new Date(Date.now() - msAgo).toISOString();
 
 const jobs = [
-  { id: 'a1b2c3', name: 'Morning Digest', prompt: 'Summarize overnight email and news into a short briefing.', schedule_display: 'every day at 08:00', enabled: true, state: 'scheduled', last_run_at: iso(3.6e6), last_status: 'ok', next_run_at: iso(-7.2e6), created_at: iso(9e8) },
-  { id: 'd4e5f6', name: 'Server Watch', prompt: 'Check the VPS disk, memory and container health.', schedule_display: 'every 30m', enabled: true, state: 'scheduled', last_run_at: iso(6e5), last_status: 'ok', next_run_at: iso(-1.2e6), created_at: iso(8e8) },
-  { id: 'g7h8i9', name: 'Repo Janitor', prompt: 'Look for stale branches and open a cleanup issue.', schedule_display: 'every Monday', enabled: false, state: 'paused', last_run_at: iso(5e8), last_status: 'ok', next_run_at: null, created_at: iso(7e8) },
-  { id: 'j1k2l3', name: 'Price Tracker', prompt: 'Check prices on the watchlist.', schedule_display: 'every 6h', enabled: true, state: 'scheduled', last_run_at: iso(2e6), last_status: 'error', last_error: 'Timeout fetching https://example.com/prices', failure_streak: 1, next_run_at: iso(-4e6), created_at: iso(6e8) },
-  { id: 'm4n5o6', name: 'Weekly Recap', prompt: 'Write the weekly recap.', schedule_display: 'every Friday 17:00', enabled: true, state: 'scheduled', last_run_at: iso(4e8), last_status: 'ok', next_run_at: iso(-3e8), created_at: iso(5e8) },
+  { id: 'a1b2c3', name: 'Morning Digest', prompt: 'Summarize overnight email and news into a short briefing.', skills: ['web-research', 'email-triage'], schedule_display: 'every day at 08:00', enabled: true, state: 'scheduled', last_run_at: iso(3.6e6), last_status: 'ok', next_run_at: iso(-7.2e6), created_at: iso(9e8), repeat: { times: null, completed: 12 } },
+  { id: 'd4e5f6', name: 'Server Watch', prompt: 'Check the VPS disk, memory and container health.', skills: ['docker-health'], schedule_display: 'every 30m', enabled: true, state: 'scheduled', last_run_at: iso(6e5), last_status: 'ok', next_run_at: iso(-1.2e6), created_at: iso(8e8), repeat: { times: null, completed: 40 } },
+  { id: 'g7h8i9', name: 'Repo Janitor', prompt: 'Look for stale branches and open a cleanup issue.', skills: [], schedule_display: 'every Monday', enabled: false, state: 'paused', last_run_at: iso(5e8), last_status: 'ok', next_run_at: null, created_at: iso(7e8), repeat: { times: null, completed: 3 } },
+  { id: 'j1k2l3', name: 'Price Tracker', prompt: 'Check prices on the watchlist.', skills: ['web-research'], schedule_display: 'every 6h', enabled: true, state: 'scheduled', last_run_at: iso(2e6), last_status: 'error', last_error: 'Timeout fetching https://example.com/prices', failure_streak: 1, next_run_at: iso(-4e6), created_at: iso(6e8), repeat: { times: null, completed: 8 } },
+  { id: 'm4n5o6', name: 'Weekly Recap', prompt: 'Write the weekly recap.', skills: ['writing'], schedule_display: 'every Friday 17:00', enabled: true, state: 'scheduled', last_run_at: iso(4e8), last_status: 'ok', next_run_at: iso(-3e8), created_at: iso(5e8), repeat: { times: null, completed: 2 } },
 ];
 const running = {};
+const skillUsage = {
+  'web-research': { use_count: 30, view_count: 4, patch_count: 2, last_patched_at: iso(9e7) },
+  'email-triage': { use_count: 12, view_count: 1, patch_count: 0 },
+  'docker-health': { use_count: 40, view_count: 2, patch_count: 1 },
+  writing: { use_count: 2, view_count: 0, patch_count: 0 },
+};
+
+function finishRun(j) {
+  j.last_run_at = iso();
+  j.last_status = 'ok';
+  j.failure_streak = 0;
+  j.repeat.completed += 1;
+}
 
 // Flip Server Watch between working and idle so walking and sitting can be watched.
 setInterval(() => {
   const j = jobs[1];
-  if (j.fire_claim) {
-    j.fire_claim = null;
-    j.last_run_at = iso();
-    j.last_status = 'ok';
-  } else {
-    j.fire_claim = { at: iso(), by: 'mock' };
-  }
+  if (j.fire_claim) { j.fire_claim = null; finishRun(j); }
+  else j.fire_claim = { at: iso(), by: 'mock' };
 }, 20000);
+
+// Hermes improves a skill now and then, which should hand out XP.
+let tick = 0;
+setInterval(() => {
+  tick += 1;
+  const names = ['web-research', 'docker-health', 'writing', 'email-triage'];
+  const name = names[tick % names.length];
+  skillUsage[name].patch_count += 1;
+  skillUsage[name].last_patched_at = iso();
+  if (tick === 3) skillUsage['calendar-planning'] = { use_count: 0, view_count: 0, patch_count: 0, created_at: iso() };
+}, 25000);
 
 const sessions = new Map();
 const streams = new Map();
@@ -117,6 +136,7 @@ http.createServer(async (req, res) => {
   if (!authed) return json(res, 401, { error: 'Authentication required' });
   if (p === '/api/auth/logout') return json(res, 200, { ok: true }, { 'Set-Cookie': 'hermes_session=; Max-Age=0; Path=/' });
 
+  if (p === '/api/skills/usage') return json(res, 200, { usage: skillUsage, skill_names: Object.keys(skillUsage) });
   if (p === '/api/crons') return json(res, 200, { jobs, active_profile: 'default' });
   if (p === '/api/crons/status') {
     const out = {};
@@ -133,7 +153,7 @@ http.createServer(async (req, res) => {
     if (!job) return json(res, 404, { error: 'Job not found' });
     if (p.endsWith('/run')) {
       running[job.id] = Date.now();
-      setTimeout(() => { delete running[job.id]; job.last_run_at = iso(); job.last_status = 'ok'; job.failure_streak = 0; }, 12000);
+      setTimeout(() => { delete running[job.id]; finishRun(job); }, 12000);
       return json(res, 200, { ok: true, job_id: job.id, status: 'running' });
     }
     job.enabled = p.endsWith('/resume');

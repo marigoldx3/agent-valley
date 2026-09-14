@@ -1,4 +1,4 @@
-/* Hermes Valley office: a pixel-art room where each agent works at a desk or wanders when idle. */
+/* Marigold Valley office: a pixel-art room where each agent works at a desk or wanders when idle. */
 (function () {
   'use strict';
 
@@ -13,7 +13,7 @@
   const OUT = '#3b1f0e';
   const SPEED = 26; // world px per second
 
-  /* ---------- helpers ---------- */
+  /* ---------- small helpers ---------- */
 
   function hash(s) {
     let h = 2166136261;
@@ -73,11 +73,15 @@
   /* ---------- characters ---------- */
 
   const SKIN = ['#f7d3ad', '#ecbc92', '#d49b6c', '#a86c46', '#7b4b2f'];
-  const HAIR = ['#3b2314', '#6b3d1f', '#a0522d', '#e0b04a', '#1f1f2b', '#ece6d6', '#7a4fa0', '#2f6f58', '#c8452f'];
-  const SHIRT = ['#3f78c0', '#c0433f', '#4f9a45', '#d99a2b', '#8a5bbf', '#2f9e9e', '#d56d9a', '#e07b39'];
-  const PANTS = ['#3a3a5e', '#4a3322', '#2b4a6b', '#55463a', '#2f4f3a'];
+  const HAIR = ['#3b2314', '#6b3d1f', '#a0522d', '#e0b04a', '#1f1f2b', '#ece6d6', '#7a4fa0', '#2f6f58', '#c8452f', '#e86fa0'];
+  const SHIRT = ['#3f78c0', '#3a6fd8', '#c0433f', '#4f9a45', '#d99a2b', '#8a5bbf', '#2f9e9e', '#d56d9a', '#e07b39', '#2b2b3a', '#e8e4d8'];
+  const PANTS = ['#3a3a5e', '#2b3a6b', '#4a3322', '#2b4a6b', '#55463a', '#2f4f3a'];
   const CHAIRS = ['#a33b2e', '#3e6a9e', '#4f8a3a', '#7a4fa0', '#3b3b4a'];
-  const STYLES = ['short', 'long', 'spiky', 'bun', 'straw', 'cap'];
+  const RANDOM_STYLES = ['short', 'long', 'bob', 'spiky', 'bun', 'straw', 'cap'];
+  const STYLE_OPTIONS = [
+    ['short', 'Short'], ['long', 'Long'], ['bob', 'Bob'], ['spiky', 'Spiky'], ['bun', 'Bun'],
+    ['straw', 'Straw hat'], ['cap', 'Cap'], ['wizard', 'Wizard hat'], ['crown', 'Crown'], ['helm', 'Winged helm'], ['bald', 'Bald'],
+  ];
 
   // Sprites are 12x18 and left/right symmetric: each row lists the left half only.
   const BODY = ['......', '...ooo', '..osss', '.ossss', '.ossss', '.ossss', '.ossss', '..osss',
@@ -85,27 +89,43 @@
   const HAIRS = {
     short: ['...ooo', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...'],
     long: ['...ooo', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...', '.oh...', '.oh...', 'oh....'],
+    bob: ['...ooo', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...', '.oh...', '.oh...'],
     spiky: ['..h.hh', '.hhhhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...'],
     bun: ['....hh', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...'],
     straw: ['...yyy', '..yyyy', '..rrrr', 'yyyyyy', '.ohhhh', '.oh...'],
     cap: ['......', '..cccc', '.ccccc', '.ccccc', '.ohhhh', '.oh...'],
+    wizard: ['.....c', '....cc', '...ccy', 'CCCCCC', '.ohhhh', '.oh...'],
+    crown: ['.g.g.g', '.ggggr', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...'],
     helm: ['w...gg', 'ww.ggg', 'wwgggg', '.wgggg', '.ohhhh', '.oh...'],
+    bald: [],
   };
 
-  function lookFor(id) {
+  function baseLook(id) {
     if (id === 'hermes') {
-      return { skin: SKIN[0], hair: '#e0b04a', shirt: '#3a6fd8', pants: '#2b3a6b', belt: '#f2c14e', style: 'helm', blush: true, cap: '#f2c14e', chair: '#c9962b' };
+      return { skin: SKIN[0], hair: '#e0b04a', shirt: '#3a6fd8', pants: '#2b3a6b', belt: '#f2c14e', style: 'helm', blush: true, glasses: false, cap: shade('#3a6fd8', 0.8), chair: '#c9962b' };
     }
     const r = seeded(hash(id));
-    const shirt = pick(SHIRT, r());
+    const shirt = pick(SHIRT.slice(0, 9), r());
     return {
-      skin: pick(SKIN, r()), hair: pick(HAIR, r()), shirt, pants: pick(PANTS, r()), belt: '#5a3a1a',
-      style: pick(STYLES, r()), blush: r() < 0.5, cap: shade(shirt, 0.8), chair: pick(CHAIRS, r()),
+      skin: pick(SKIN, r()), hair: pick(HAIR.slice(0, 9), r()), shirt, pants: pick(PANTS, r()), belt: '#5a3a1a',
+      style: pick(RANDOM_STYLES, r()), blush: r() < 0.5, glasses: false, cap: shade(shirt, 0.8), chair: pick(CHAIRS, r()),
     };
   }
 
+  // A saved look only overrides the fields the person picked.
+  function lookFor(id, override) {
+    const base = baseLook(id);
+    if (!override) return base;
+    const L = Object.assign({}, base, override);
+    L.cap = shade(L.shirt, 0.8);
+    return L;
+  }
+
   function colorMap(L) {
-    return { o: OUT, s: L.skin, h: L.hair, t: L.shirt, T: shade(L.shirt, 0.78), k: L.belt, y: '#eac35c', r: '#c0392b', c: L.cap, g: '#f2c14e', w: '#ffffff' };
+    return {
+      o: OUT, s: L.skin, h: L.hair, t: L.shirt, T: shade(L.shirt, 0.78), k: L.belt, y: '#eac35c', r: '#c0392b',
+      c: L.cap, C: shade(L.cap, 0.72), g: '#f2c14e', w: '#ffffff',
+    };
   }
 
   function legs(L, lift) {
@@ -144,6 +164,9 @@
       R(x + 4, y + 5, 1, 1, '#2a1a10');
       R(x + 7, y + 5, 1, 1, '#2a1a10');
     }
+    if (L.glasses) {
+      R(x + 3, y + 5, 1, 1, '#2a2a3a'); R(x + 5, y + 5, 2, 1, '#2a2a3a'); R(x + 8, y + 5, 1, 1, '#2a2a3a');
+    }
     if (L.blush) { R(x + 3, y + 6, 1, 1, '#f3907c'); R(x + 8, y + 6, 1, 1, '#f3907c'); }
   }
 
@@ -166,6 +189,7 @@
     book: { c: '#7a4424', c2: '#f3e6c8', rows: ['.......', '.##.##.', '#++#++#', '#++#++#', '#++#++#', '.##.##.', '.......'] },
     gear: { c: '#6b6b6b', c2: '#a8a8a8', rows: ['..#.#..', '.#####.', '##+++##', '.#+.+#.', '##+++##', '.#####.', '..#.#..'] },
     star: { c: '#e5a81f', rows: ['...#...', '...#...', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'] },
+    flower: { c: '#f5a01f', c2: '#b8451a', rows: ['.#...#.', '###.###', '.#+#+#.', '..#+#..', '.#+#+#.', '###.###', '.#...#.'] },
   };
 
   function bubble(cx, top, icon) {
@@ -196,6 +220,22 @@
       else R(x, y, 1, 1, p.color);
     }
     g.globalAlpha = 1;
+  }
+
+  /* ---------- marigolds ---------- */
+
+  function marigold(x, y) {
+    R(x, y, 3, 3, '#f5a01f');
+    R(x, y, 1, 1, '#ffcf3f'); R(x + 2, y + 2, 1, 1, '#ffcf3f');
+    R(x + 2, y, 1, 1, '#e8841a'); R(x, y + 2, 1, 1, '#e8841a');
+    R(x + 1, y + 1, 1, 1, '#b8451a');
+  }
+
+  function drawMarigoldPot(x, base) {
+    R(x + 1, base - 10, 1, 5, '#3a7a35'); R(x + 4, base - 11, 1, 6, '#3a7a35'); R(x + 6, base - 9, 1, 4, '#3a7a35');
+    R(x, base - 8, 3, 2, '#5ba044'); R(x + 5, base - 8, 3, 2, '#5ba044');
+    marigold(x - 1, base - 13); marigold(x + 3, base - 14); marigold(x + 5, base - 11);
+    box(x, base - 6, 8, 6, '#b5552b'); R(x, base - 6, 8, 1, '#d0703a'); R(x, base - 6, 8, 1, OUT);
   }
 
   /* ---------- scenery ---------- */
@@ -249,6 +289,13 @@
     R(x - 3, y + h + 2, w + 6, 2, '#b8612a'); R(x - 3, y + h + 4, w + 6, 1, OUT);
     R(x - 5, y - 3, 3, h + 6, '#c0433f'); R(x - 5, y - 3, 1, h + 6, '#8e3228');
     R(x + w + 2, y - 3, 3, h + 6, '#c0433f'); R(x + w + 4, y - 3, 1, h + 6, '#8e3228');
+    // window box full of marigolds
+    R(x - 1, y + h + 1, w + 2, 3, '#4f9a45');
+    for (let i = 0; i < Math.floor(w / 6); i++) {
+      R(x + 2 + i * 6, y + h - 1, 1, 3, '#3a7a35');
+      marigold(x + 1 + i * 6 + (i % 2), y + h - 2 - (i % 2));
+    }
+    box(x - 2, y + h + 4, w + 4, 6, '#9a5627'); R(x - 1, y + h + 5, w + 2, 1, '#c98646');
   }
 
   function drawClock(cx, cy, date) {
@@ -312,19 +359,11 @@
 
   function drawTallPlant(x, base) {
     const leaves = [[5, -27, 3, 7], [1, -23, 5, 4], [7, -22, 5, 5], [2, -17, 5, 5], [7, -16, 5, 4], [4, -20, 4, 11]];
-    for (const [lx, ly, w, h] of leaves) {
-      R(x + lx - 1, base + ly - 1, w + 2, h + 2, OUT);
-    }
+    for (const [lx, ly, w, h] of leaves) R(x + lx - 1, base + ly - 1, w + 2, h + 2, OUT);
     for (const [lx, ly, w, h] of leaves) {
       R(x + lx, base + ly, w, h, '#3a7a35'); R(x + lx, base + ly, w - 1, h - 1, '#5ba044'); R(x + lx, base + ly, 1, 1, '#8fd16a');
     }
     box(x + 2, base - 8, 9, 8, '#b5552b'); R(x + 2, base - 8, 9, 2, '#d0703a'); R(x + 2, base - 8, 9, 1, OUT);
-  }
-
-  function drawSmallPlant(x, base) {
-    R(x, base - 12, 8, 7, OUT);
-    R(x + 1, base - 11, 6, 5, '#4f9a45'); R(x + 2, base - 12, 2, 1, '#5ba044'); R(x + 1, base - 11, 2, 2, '#8fd16a');
-    box(x + 1, base - 6, 6, 6, '#b5552b'); R(x + 1, base - 6, 6, 1, '#d0703a');
   }
 
   const COUCH = '#b5473a', COUCH_D = '#8e3228', COUCH_L = '#d0634f';
@@ -341,7 +380,7 @@
     R(x + 1, y + 24, 2, 2, OUT); R(x + 43, y + 24, 2, 2, OUT);
   }
 
-  function drawBin(t) {
+  function drawBin() {
     const { x, base } = S.bin;
     const y = base - 14;
     const open = S.now < S.binOpenUntil;
@@ -352,7 +391,7 @@
     else { box(x - 1, y, 22, 5, '#c98646'); R(x, y + 1, 20, 1, '#e0a060'); R(x + 9, y + 2, 2, 1, '#f2c14e'); }
   }
 
-  function drawCounter(t) {
+  function drawCounter() {
     const { x, base } = S.counter;
     const y = base - 16;
     box(x, y, 42, 16, '#8a4f24');
@@ -389,7 +428,12 @@
     if (working && Math.floor(t * 8 + d.i) % 3) R(lx + 1, ly, 7, 1, '#bff6ff');
 
     const ix = d.cx + 8, iy = y - 3;
-    if (d.item === 0) { box(ix, iy, 4, 4, '#ffffff'); R(ix + 4, iy + 1, 1, 2, OUT); }
+    if (d.gold) {
+      // a vase of marigolds on the head desk
+      R(ix + 1, iy - 3, 1, 3, '#3a7a35'); R(ix + 3, iy - 4, 1, 4, '#3a7a35');
+      marigold(ix - 1, iy - 6); marigold(ix + 2, iy - 7);
+      box(ix, iy, 5, 4, '#3a6fd8'); R(ix + 1, iy + 1, 3, 1, '#7ea6f0');
+    } else if (d.item === 0) { box(ix, iy, 4, 4, '#ffffff'); R(ix + 4, iy + 1, 1, 2, OUT); }
     else if (d.item === 1) { box(ix, iy, 5, 4, '#b5552b'); R(ix, iy - 4, 5, 4, '#4f9a45'); R(ix + 1, iy - 5, 2, 1, '#5ba044'); }
     else { R(ix - 1, iy, 7, 1, '#c0433f'); R(ix - 1, iy + 1, 7, 1, '#3f78c0'); R(ix, iy - 1, 6, 1, '#4f9a45'); R(ix - 1, iy + 2, 7, 1, OUT); }
 
@@ -400,41 +444,76 @@
     }
   }
 
-  /* ---------- the cat ---------- */
+  /* ---------- the office dog (white with black spots) ---------- */
 
-  function drawCat(c, t) {
-    const x = Math.round(c.x), y = Math.round(c.y);
+  function paintDog(c, x, y, t) {
     const fx = (px, w) => (c.dir > 0 ? x + px : x - px - w);
-    const fur = '#e0823a', dark = '#b8612a';
-    const step = c.moving ? Math.floor(t * 8) % 2 : 0;
-    const rects = c.sleep
-      ? [[-4, -4, 8, 4, fur], [2, -5, 3, 3, fur], [-5, -2, 2, 2, dark]]
-      : [[-4, -5, 7, 3, fur], [2, -7, 4, 4, fur], [2, -8, 1, 1, fur], [5, -8, 1, 1, fur], [-5, -8, 1, 4, dark],
-        [-3 + step, -2, 1, 2, fur], [1 - step, -2, 1, 2, fur]];
-    for (const [px, py, w, h] of rects) R(fx(px, w) - 1, y + py - 1, w + 2, h + 2, OUT);
-    for (const [px, py, w, h, col] of rects) R(fx(px, w), y + py, w, h, col);
-    if (c.sleep) R(fx(3, 1), y - 4, 1, 1, '#2a1a10');
-    else { R(fx(4, 1), y - 6, 1, 1, '#2a1a10'); R(fx(-2, 1), y - 5, 1, 1, dark); R(fx(0, 1), y - 5, 1, 1, dark); }
+    const WH = '#f6f5f0', BL = '#1e1e24';
+    const step = c.moving ? Math.floor(t * 10) % 2 : 0;
+    const wag = Math.floor(t * (c.happy ? 14 : 4)) % 2;
+    let parts, spots;
+    if (c.sleep) {
+      parts = [[-5, -4, 10, 4, WH], [3, -6, 4, 3, WH], [-7, -3, 2, 1, WH]];
+      spots = [[3, -6, 2, 3, BL], [-2, -4, 2, 2, BL], [1, -2, 2, 1, BL], [-4, -2, 1, 1, BL], [5, -4, 1, 1, '#6a6a70']];
+    } else {
+      parts = [
+        [-5, -7, 9, 4, WH],
+        [3, -10, 5, 5, WH],
+        [8, -8, 2, 2, WH],
+        wag ? [-7, -9, 2, 1, WH] : [-6, -10, 1, 3, WH],
+        [-4, -3, 1, step ? 2 : 3, WH], [-2, -3, 1, step ? 3 : 2, WH], [1, -3, 1, step ? 2 : 3, WH], [3, -3, 1, step ? 3 : 2, WH],
+      ];
+      spots = [[3, -10, 2, 4, BL], [-3, -6, 2, 2, BL], [0, -7, 2, 1, BL], [1, -5, 1, 1, BL], [-5, -4, 1, 1, BL],
+        [9, -8, 1, 1, BL], [6, -9, 1, 1, '#2a1a10'], [4, -6, 1, 2, '#c0392b']];
+      if (c.happy) spots.push([8, -6, 1, 1, '#e86a7a']);
+    }
+    for (const [px, py, w, h] of parts) R(fx(px, w) - 1, y + py - 1, w + 2, h + 2, OUT);
+    for (const [px, py, w, h, col] of parts) R(fx(px, w), y + py, w, h, col);
+    for (const [px, py, w, h, col] of spots) R(fx(px, w), y + py, w, h, col);
   }
 
-  function updateCat(dt, t) {
-    const c = S.cat;
-    if (c.target) {
-      const dx = c.target.x - c.x, dy = c.target.y - c.y, dist = Math.hypot(dx, dy), step = 13 * dt;
-      c.moving = true;
-      if (Math.abs(dx) > 0.3) c.dir = Math.sign(dx);
-      if (dist <= step) { c.x = c.target.x; c.y = c.target.y; c.target = null; c.until = t + rnd(3, 10); c.sleep = Math.random() < (S.dark > 0.5 ? 0.7 : 0.35); }
-      else { c.x += (dx / dist) * step; c.y += (dy / dist) * step; }
+  function updateDog(dt, t) {
+    const d = S.dog;
+    d.happy = t < d.happyUntil;
+    if (d.follow) {
+      const a = S.agents.get(d.follow);
+      if (!a || a.seated || a.pose || t > d.followUntil) { d.follow = null; d.target = null; d.until = t + rnd(2, 5); }
+      else d.target = { x: clamp(a.x + (a.x > d.x ? -10 : 10), 8, W - 8), y: a.y + 1 };
+    }
+    if (d.target) {
+      const dx = d.target.x - d.x, dy = d.target.y - d.y, dist = Math.hypot(dx, dy), step = (d.follow ? 24 : 16) * dt;
+      if (dist <= Math.max(step, 0.5)) {
+        d.x = d.target.x; d.y = d.target.y; d.moving = false;
+        if (d.follow) { d.happyUntil = t + 0.4; return; }
+        d.target = null;
+        d.until = t + rnd(3, 9);
+        d.sleep = Math.random() < (S.dark > 0.5 ? 0.55 : 0.2);
+        return;
+      }
+      d.moving = true;
+      if (Math.abs(dx) > 0.3) d.dir = Math.sign(dx);
+      d.x += (dx / dist) * step;
+      d.y += (dy / dist) * step;
       return;
     }
-    c.moving = false;
-    if (c.sleep && t > c.nextZ) { c.nextZ = t + 1.6; spawn({ kind: 'z', x: c.x + 2, y: c.y - 10, vx: 2, vy: -5, life: 1.8, color: '#6b7fd8' }); }
-    if (t > c.until) {
-      c.sleep = false;
-      c.target = Math.random() < 0.6
-        ? { x: rnd(80, 150), y: rnd(S.LT + 16, S.LT + 50) }
-        : { x: rnd(20, 236), y: pick(S.corridors) + 2 };
+    d.moving = false;
+    if (d.sleep && t > d.nextZ) { d.nextZ = t + 1.6; spawn({ kind: 'z', x: d.x + 2, y: d.y - 10, vx: 2, vy: -5, life: 1.8, color: '#6b7fd8' }); }
+    if (t > d.until) {
+      d.sleep = false;
+      const walkers = [...S.agents.values()].filter((a) => !a.seated && !a.pose);
+      const r = Math.random();
+      if (r < 0.35 && walkers.length) { d.follow = pick(walkers).id; d.followUntil = t + rnd(6, 14); }
+      else d.target = r < 0.75 ? { x: rnd(80, 150), y: rnd(S.LT + 16, S.LT + 50) } : { x: rnd(20, 236), y: pick(S.corridors) + 2 };
     }
+  }
+
+  function petDog() {
+    const d = S.dog;
+    for (let i = 0; i < 3; i++) spawn({ kind: 'heart', x: d.x + rnd(-4, 4), y: d.y - 12, vx: rnd(-4, 4), vy: rnd(-14, -8), life: 1.3, color: '#e0415a' });
+    d.sleep = false;
+    d.happyUntil = S.now + 2.5;
+    d.bubbleUntil = S.now + 2;
+    d.until = Math.max(d.until, S.now + 2.5);
   }
 
   /* ---------- layout & movement ---------- */
@@ -467,8 +546,9 @@
       { id: 'books', x: 146, y: WALL_H + 8, emote: 'book' },
       { id: 'arcade', x: 233, y: WALL_H + 8, emote: 'note', arcade: true },
       { id: 'plant', x: 22, y: WALL_H + 8, emote: 'drop' },
-      { id: 'window', x: 38, y: WALL_H + 8, emote: 'dots' },
+      { id: 'window', x: 38, y: WALL_H + 8, emote: 'flower' },
       { id: 'window2', x: 188, y: WALL_H + 8, emote: 'heart' },
+      { id: 'marigolds', x: 68, y: LT + 40, emote: 'flower' },
       { id: 'couch0', seat: 0, x: S.seats[0].x, y: LT + 40, emote: 'heart' },
       { id: 'couch1', seat: 1, x: S.seats[1].x, y: LT + 40, emote: 'note' },
     ].map((p) => Object.assign(p, { occ: null }));
@@ -668,15 +748,19 @@
   }
 
   function createAgent(info) {
-    const look = lookFor(info.id);
+    const look = lookFor(info.id, info.look);
     const a = {
-      id: info.id, name: info.name, look, sprites: buildSprites(look),
+      id: info.id, name: info.name, look, lookKey: JSON.stringify(info.look || null), sprites: buildSprites(look), level: 0,
       x: rnd(84, 150), y: S.LT + rnd(16, 46), path: [], task: null, seated: false, pose: null, sleeping: false,
       emote: null, want: {}, phase: Math.random() * 10, blinkOffset: Math.random() * 4,
       nextEmote: S.now + rnd(2, 6), nextZ: 0, nextBit: 0, pendingDeliver: false, walkT: 0, deskIndex: 0, moving: false,
     };
     a.tag = document.createElement('div');
     a.tag.className = 'tag';
+    a.tagLv = document.createElement('span');
+    a.tagLv.className = 'lv';
+    a.tagName = document.createElement('span');
+    a.tag.append(a.tagLv, a.tagName);
     S.tagsEl.append(a.tag);
     return a;
   }
@@ -691,7 +775,10 @@
       seen.add(info.id);
       let a = S.agents.get(info.id);
       if (!a) { a = createAgent(info); S.agents.set(info.id, a); }
+      const key = JSON.stringify(info.look || null);
+      if (a.lookKey !== key) { a.lookKey = key; a.look = lookFor(a.id, info.look); a.sprites = buildSprites(a.look); }
       a.name = info.name;
+      a.level = info.level || 0;
       a.statusText = info.status || '';
       const want = { working: !!info.working, paused: !!info.paused && !info.working, error: !!info.error };
       if (a.want.working && !want.working) {
@@ -714,6 +801,7 @@
         a.x = clamp(a.x, 8, W - 8); a.y = clamp(a.y, WALL_H + 8, S.H - 4);
         a.replan = true;
       }
+      if (S.dog) { S.dog.y = clamp(S.dog.y, WALL_H + 10, S.H - 4); S.dog.target = null; S.dog.follow = null; }
     }
     S.notes = list.filter((x) => x.id !== 'hermes').map((x) => ({
       color: x.working ? '#b5ec8a' : x.paused ? '#d9d2c0' : x.error ? '#f4a09a' : '#fbe9a0',
@@ -722,7 +810,13 @@
 
   function updateTag(a) {
     const txt = a.name + (a.statusText ? ' · ' + a.statusText : '');
-    if (a._txt !== txt) { a.tag.textContent = txt; a._txt = txt; a._w = 0; }
+    const lv = a.level ? `Lv${a.level}` : '';
+    if (a._txt !== txt || a._lv !== lv) {
+      a.tagName.textContent = txt;
+      a.tagLv.textContent = lv;
+      a.tagLv.hidden = !lv;
+      a._txt = txt; a._lv = lv; a._w = 0;
+    }
     const cls = 'tag' + (a.want.working ? ' is-working' : a.want.paused ? ' is-paused' : '') +
       (a.want.error ? ' is-error' : '') + (a.id === 'hermes' ? ' is-hermes' : '');
     if (a._cls !== cls) { a.tag.className = cls; a._cls = cls; a._w = 0; }
@@ -734,15 +828,45 @@
     if (a._tr !== tr) { a.tag.style.transform = tr; a._tr = tr; }
   }
 
+  function floatText(id, text) {
+    let x, y;
+    if (id === 'dog') { x = S.dog.x; y = S.dog.y - 14; }
+    else {
+      const a = S.agents.get(id);
+      if (!a) return;
+      x = headX(a); y = topOf(a) - 3;
+    }
+    const n = document.createElement('div');
+    n.className = 'float-xp';
+    n.textContent = text;
+    n.style.setProperty('--x', `${(clamp(x, 16, W - 16) * S.scale).toFixed(1)}px`);
+    n.style.setProperty('--y', `${(Math.max(y, 8) * S.scale).toFixed(1)}px`);
+    S.tagsEl.append(n);
+    setTimeout(() => n.remove(), 2100);
+  }
+
+  function levelUp(id) {
+    const a = S.agents.get(id);
+    if (!a) return;
+    const x = headX(a), y = topOf(a) + 6;
+    for (let i = 0; i < 24; i++) {
+      const ang = (i / 24) * Math.PI * 2;
+      spawn({ kind: 'spark', x: x + Math.cos(ang) * 3, y: y + Math.sin(ang) * 3, vx: Math.cos(ang) * 24, vy: Math.sin(ang) * 24 - 8, life: 1.2, color: pick(['#fff3a0', '#f2c14e', '#ffffff', '#9ee05a']) });
+    }
+    emote(a, 'star', 3.5);
+  }
+
   function hit(wx, wy) {
     let best = null, by = -Infinity;
     for (const a of S.agents.values()) {
       const hx = headX(a), top = topOf(a), bottom = a.seated ? S.desks[a.deskIndex].ty + 16 : footY(a);
       if (wx >= hx - 10 && wx <= hx + 10 && wy >= top - 4 && wy <= bottom + 4 && bottom > by) { best = a; by = bottom; }
     }
-    if (best) return best;
-    for (const d of S.desks) {
-      if (d.agent && wx >= d.cx - 16 && wx <= d.cx + 16 && wy >= d.ty - 12 && wy <= d.ty + 17) return d.agent;
+    if (best) return best.id;
+    const d = S.dog;
+    if (Math.abs(wx - d.x) < 11 && wy > d.y - 14 && wy < d.y + 3) return 'dog';
+    for (const desk of S.desks) {
+      if (desk.agent && wx >= desk.cx - 16 && wx <= desk.cx + 16 && wy >= desk.ty - 12 && wy <= desk.ty + 17) return desk.agent.id;
     }
     return null;
   }
@@ -751,15 +875,9 @@
     const rect = S.canvas.getBoundingClientRect();
     const wx = ((e.clientX - rect.left) * W) / rect.width;
     const wy = ((e.clientY - rect.top) * S.H) / rect.height;
-    const c = S.cat;
-    if (Math.abs(wx - c.x) < 8 && wy > c.y - 11 && wy < c.y + 3) {
-      for (let i = 0; i < 3; i++) spawn({ kind: 'heart', x: c.x + rnd(-4, 4), y: c.y - 10, vx: rnd(-4, 4), vy: rnd(-14, -8), life: 1.3, color: '#e0415a' });
-      c.sleep = false;
-      c.until = S.now + 2;
-      return;
-    }
-    const a = hit(wx, wy);
-    if (a && S.onTap) S.onTap(a.id);
+    const id = hit(wx, wy);
+    if (id === 'dog') petDog();
+    if (id && S.onTap) S.onTap(id);
   }
 
   function frame(ts) {
@@ -773,7 +891,7 @@
     S.dark = sky.dark;
 
     for (const a of S.agents.values()) updateAgent(a, dt);
-    updateCat(dt, t);
+    updateDog(dt, t);
 
     const coffeePoi = S.pois.find((p) => p.id === 'coffee');
     S.coffeeBusy = !!(coffeePoi && coffeePoi.occ && S.agents.get(coffeePoi.occ) && !S.agents.get(coffeePoi.occ).moving);
@@ -796,10 +914,10 @@
       { y: 62, draw: () => drawArcade(226, 34, t, playing) },
       { y: 62, draw: () => drawTallPlant(2, 62) },
       { y: S.couch.y + 24, draw: () => drawCouch(t) },
-      { y: S.bin.base, draw: () => drawBin(t) },
-      { y: S.counter.base, draw: () => drawCounter(t) },
-      { y: S.LT + 34, draw: () => drawSmallPlant(64, S.LT + 34) },
-      { y: S.cat.y, draw: () => drawCat(S.cat, t) },
+      { y: S.bin.base, draw: drawBin },
+      { y: S.counter.base, draw: drawCounter },
+      { y: S.LT + 34, draw: () => drawMarigoldPot(64, S.LT + 34) },
+      { y: S.dog.y, draw: () => paintDog(S.dog, Math.round(S.dog.x), Math.round(S.dog.y), t) },
     ];
     for (const d of S.desks) drawables.push({ y: d.ty + DESK_H, draw: () => drawDeskUnit(d, t) });
     for (const a of S.agents.values()) {
@@ -817,6 +935,7 @@
     for (const a of S.agents.values()) {
       if (a.emote && t < a.emote.until) bubble(headX(a), topOf(a), a.emote.icon);
     }
+    if (t < S.dog.bubbleUntil) bubble(S.dog.x + S.dog.dir * 4, S.dog.y - 10, 'heart');
     drawParticles(dt);
     lighting(sky, playing);
     for (const a of S.agents.values()) updateTag(a);
@@ -854,7 +973,7 @@
     S.onTap = opts.onTap;
     S.books = makeBooks();
     layout(0);
-    S.cat = { x: 110, y: S.LT + 30, dir: 1, target: null, until: 3, sleep: false, nextZ: 0, moving: false };
+    S.dog = { x: 112, y: S.LT + 32, dir: 1, target: null, until: 3, sleep: false, nextZ: 0, moving: false, happy: false, happyUntil: 0, bubbleUntil: 0, follow: null, followUntil: 0 };
     new ResizeObserver(resize).observe(S.wrap);
     S.stage.addEventListener('click', onClick);
     document.addEventListener('visibilitychange', () => {
@@ -864,17 +983,27 @@
     S.raf = requestAnimationFrame(frame);
   }
 
-  function drawPortrait(canvas, id) {
-    const look = lookFor(id);
-    const sprites = buildSprites(look);
-    canvas.width = 14;
-    canvas.height = 13;
+  // Head-and-shoulders portrait, or the whole body when `full` is set (used while customizing).
+  function drawPortrait(canvas, id, look, full) {
     const prev = g;
     g = canvas.getContext('2d');
+    if (id === 'dog') {
+      canvas.width = 18; canvas.height = 14;
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, 18, 14);
+      paintDog({ dir: 1, sleep: false, moving: false, happy: true }, 8, 13, 0);
+      g = prev;
+      return;
+    }
+    const L = lookFor(id, look);
+    const sprites = buildSprites(L);
+    const h = full ? 18 : 12;
+    canvas.width = 14;
+    canvas.height = h + 2;
     g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, 14, 13);
-    g.drawImage(sprites.stand, 0, 0, 12, 12, 1, 1, 12, 12);
-    face({ look, sleeping: false, blinkOffset: 1 }, 1, 1, 0);
+    g.clearRect(0, 0, 14, h + 2);
+    g.drawImage(sprites.stand, 0, 0, 12, h, 1, 1, 12, h);
+    face({ look: L, sleeping: false, blinkOffset: 1 }, 1, 1, 0);
     g = prev;
   }
 
@@ -884,6 +1013,7 @@
     const ctx = canvas.getContext('2d');
     const hermes = { look: lookFor('hermes'), sleeping: false, blinkOffset: 0.5 };
     hermes.sprites = buildSprites(hermes.look);
+    const pup = { dir: -1, sleep: false, moving: false, happy: true };
     const clouds = Array.from({ length: 5 }, (_, i) => ({ x: i * 44 + rnd(0, 20), y: rnd(8, 46), s: rnd(2, 5), big: Math.random() < 0.5 }));
     const birds = [];
     let raf = 0;
@@ -933,11 +1063,18 @@
       for (let x = 3; x < w; x += 11) { R(x, h - 12 + (x % 5), 1, 2, '#3a7a35'); R(x + 1, h - 13 + (x % 5), 1, 3, '#3a7a35'); }
       for (let x = 4; x < w; x += 16) { R(x - 1, h - 33, 5, 13, OUT); R(x, h - 32, 3, 12, '#c98646'); R(x, h - 32, 3, 1, '#e0a060'); }
       R(0, h - 29, w, 2, '#b8733c'); R(0, h - 24, w, 2, '#b8733c');
+      // a field of marigolds in front of the fence
+      for (let x = 5, i = 0; x < w; x += 9, i++) {
+        const y = h - 16 + (i % 3) * 3;
+        R(x + 1, y + 3, 1, 3, '#3a7a35');
+        marigold(x, y);
+      }
 
       const hx = Math.round(w * 0.5) - 6, hy = h - 38 + (Math.floor(t * 2) % 2);
       g.drawImage(hermes.sprites.stand, hx, hy);
       face(hermes, hx, hy, t);
-      if (Math.floor(t * 3) % 2) { R(hx - 1, hy + 9, 1, 2, hermes.look.skin); } // wave
+      if (Math.floor(t * 3) % 2) R(hx - 1, hy + 9, 1, 2, hermes.look.skin); // wave
+      paintDog(pup, hx + 24, h - 20, t);
     }
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
@@ -948,6 +1085,11 @@
     setAgents,
     drawPortrait,
     title,
+    floatText,
+    levelUp,
+    petDog,
+    defaultLook: (id) => baseLook(id),
+    palette: { skin: SKIN, hair: HAIR, shirt: SHIRT, pants: PANTS, styles: STYLE_OPTIONS },
     emote(id, icon) { const a = S.agents.get(id); if (a) emote(a, icon); },
     pulse(id, kind) {
       const a = S.agents.get(id);

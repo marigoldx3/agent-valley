@@ -112,6 +112,7 @@ button, input, textarea { font: inherit; color: inherit; }
     0 9px 0 rgba(43, 20, 8, .45);
   animation: bob 3s steps(2) infinite;
 }
+.logo span:first-child { color: #ffb52e; }
 .logo span:last-child { color: #9ee05a; }
 .login-box { width: min(340px, 100%); display: grid; gap: 10px; }
 .login-box label { font-weight: 600; font-size: 17px; }
@@ -400,6 +401,105 @@ button, input, textarea { font: inherit; color: inherit; }
 .toast-bad { background: #fbd6cc; }
 .toast-good { background: #e2f3c6; }
 
+/* ---------- levels, XP and name tags ---------- */
+
+.tag .lv { color: #ffe25a; font-weight: 700; margin-right: 3px; }
+.float-xp {
+  position: absolute; left: 0; top: 0;
+  font: 700 13px/1 var(--font);
+  color: #ffe25a;
+  text-shadow: 1px 0 #3b1f0e, -1px 0 #3b1f0e, 0 1px #3b1f0e, 0 -1px #3b1f0e;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: floatup 2s ease-out forwards;
+}
+@keyframes floatup {
+  from { transform: translate(var(--x), var(--y)) translate(-50%, -100%); opacity: 1; }
+  to { transform: translate(var(--x), calc(var(--y) - 30px)) translate(-50%, -100%); opacity: 0; }
+}
+.level { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.level-badge { font-weight: 700; font-size: 14px; background: #f7c85c; border: 2px solid var(--wood-dark); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.xpbar { flex: 1; min-width: 60px; height: 14px; background: #5b2d0f; border: 2px solid var(--night); border-radius: 3px; overflow: hidden; }
+.xpbar i {
+  display: block; height: 100%;
+  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(59, 31, 14, .35) 9px 10px), linear-gradient(#b5ec8a, #5ba044);
+  transition: width .6s steps(8);
+}
+.xp-text { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.real-name { font-size: 12px; color: var(--ink-soft); text-align: center; line-height: 1.1; }
+.real-name:empty { display: none; }
+
+/* ---------- customizing an agent ---------- */
+
+.portrait-frame.full { height: 132px; }
+.portrait-frame.full canvas { width: auto; height: 100%; margin: 0 auto; }
+.editor { display: flex; flex-direction: column; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-weight: 600; font-size: 14px; color: var(--ink-soft); }
+.nick-input {
+  font-size: 16px;
+  background: var(--parch-2);
+  border: 3px solid var(--night);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--ink);
+  outline: none;
+}
+.nick-input:focus { border-color: #2a6f3a; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip-btn {
+  font-size: 13px; line-height: 1;
+  background: var(--parch-2);
+  border: 2px solid #d9a95e;
+  border-radius: 5px;
+  padding: 6px 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.chip-btn.on { background: #f3b04e; border-color: var(--wood-dark); font-weight: 700; }
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+.swatch {
+  width: 28px; height: 28px;
+  border: 3px solid var(--night);
+  border-radius: 5px;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .25);
+}
+.swatch.on { outline: 3px solid #f3b04e; outline-offset: 1px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.toggle input { width: 20px; height: 20px; accent-color: #5ba044; }
+
+/* ---------- minimized chat ---------- */
+
+.app.chat-min .chat { display: none; }
+.app.chat-min .office-wrap { flex: 1 1 auto; height: auto; min-height: 0; border-bottom: 0; }
+.app.chat-min .office-toggle { display: none; }
+.chat-fab {
+  position: fixed; z-index: 15;
+  right: 14px; bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 64px; height: 64px;
+  padding: 4px;
+  background: linear-gradient(#7ec8f0, #bfe6f7);
+  border: 4px solid var(--wood-dark);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px var(--wood-light), 0 4px 0 rgba(0, 0, 0, .35);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.chat-fab.busy { animation: bob 1s steps(2) infinite; }
+.fab-badge {
+  position: absolute; top: -10px; right: -10px;
+  min-width: 24px; height: 24px; padding: 0 6px;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: #d9412b;
+  border: 2px solid var(--night);
+  border-radius: 12px;
+}
+.toast-level { background: #fff0b3; font-weight: 600; }
+
 /* ---------- phones: a slimmer clock so it covers less of the room ---------- */
 
 @media (max-width: 899px) {
@@ -419,6 +519,7 @@ button, input, textarea { font: inherit; color: inherit; }
   .chat { flex: 0 0 min(460px, 42vw); }
   .office-toggle { display: none; }
   .hud { right: calc(min(460px, 42vw) + 10px); }
+  .app.chat-min .hud { right: 10px; }
   .dialog { left: 50%; right: auto; width: 580px; transform: translateX(-50%); bottom: 24px; }
   .toasts { left: 12px; right: auto; }
 }

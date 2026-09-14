@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Valley">
-<title>Hermes Valley</title>
+<meta name="apple-mobile-web-app-title" content="Marigold">
+<title>Marigold Valley</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -25,7 +25,7 @@
 <section id="login" class="login" hidden>
   <canvas id="title-canvas" class="title-canvas" aria-hidden="true"></canvas>
   <div class="login-inner">
-    <h1 class="logo"><span>Hermes</span><span>Valley</span></h1>
+    <h1 class="logo"><span>Marigold</span><span>Valley</span></h1>
     <form id="login-form" class="frame login-box">
       <label for="password">Password</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
@@ -55,11 +55,12 @@
     <header class="chat-head">
       <span class="portrait-frame-sm"><canvas id="chat-portrait" class="pix"></canvas></span>
       <div class="chat-title">
-        <strong>Hermes</strong>
+        <strong id="chat-name">Hermes</strong>
         <span id="chat-status">at the desk</span>
       </div>
       <button id="btn-journal" class="icon-btn" type="button" aria-label="Past chats">📜</button>
       <button id="btn-new" class="icon-btn" type="button" aria-label="New chat">🌱</button>
+      <button id="btn-min" class="icon-btn" type="button" aria-label="Minimize chat">▾</button>
     </header>
     <div id="messages" class="messages"></div>
     <form id="composer" class="composer">
@@ -67,6 +68,11 @@
       <button id="send" class="btn btn-go send" type="submit" aria-label="Send">➤</button>
     </form>
   </section>
+
+  <button id="chat-fab" class="chat-fab" type="button" aria-label="Open chat" hidden>
+    <canvas id="fab-portrait" class="pix"></canvas>
+    <span id="fab-badge" class="fab-badge" hidden></span>
+  </button>
 </main>
 
 <div id="backdrop" class="backdrop" hidden></div>
@@ -75,15 +81,20 @@
   <button class="close-x" type="button" data-close aria-label="Close">✕</button>
   <div class="card-body">
     <div class="card-text">
-      <p id="card-greet" class="card-greet"></p>
-      <dl id="card-facts" class="facts"></dl>
-      <p id="card-prompt" class="card-prompt"></p>
-      <div id="card-report" class="card-report md" hidden></div>
-      <div id="card-actions" class="card-actions"></div>
+      <div id="card-info">
+        <p id="card-greet" class="card-greet"></p>
+        <div id="card-level" class="level"></div>
+        <dl id="card-facts" class="facts"></dl>
+        <p id="card-prompt" class="card-prompt"></p>
+        <div id="card-report" class="card-report md" hidden></div>
+        <div id="card-actions" class="card-actions"></div>
+      </div>
+      <div id="card-editor" class="editor" hidden></div>
     </div>
     <div class="card-side">
-      <div class="portrait-frame"><canvas id="card-portrait" class="pix"></canvas></div>
+      <div id="card-frame" class="portrait-frame"><canvas id="card-portrait" class="pix"></canvas></div>
       <div id="card-name" class="name-plate"></div>
+      <div id="card-realname" class="real-name"></div>
     </div>
   </div>
 </section>
