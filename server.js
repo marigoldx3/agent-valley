@@ -138,6 +138,19 @@ const XP_SKILL = 50; // a skill the agent uses was created or improved
 const XP_RUN_OK = 5; // a scheduled run finished
 const XP_RUN_ERROR = 1;
 const STYLES = new Set(['short', 'long', 'bob', 'spiky', 'bun', 'straw', 'cap', 'wizard', 'crown', 'helm', 'bald']);
+const LOOK_CHOICES = {
+  style: STYLES,
+  body: new Set(['masc', 'fem']),
+  top: new Set(['tee', 'stripes', 'hoodie', 'vest', 'tie', 'overalls']),
+  bottom: new Set(['pants', 'shorts', 'skirt']),
+};
+const DECOR = {
+  wall: new Set(['cream', 'mint', 'rose', 'sky', 'brick', 'cabin', 'night']),
+  floor: new Set(['oak', 'walnut', 'birch', 'tiles']),
+  wood: new Set(['oak', 'walnut', 'birch', 'white', 'mint']),
+  couch: new Set(['red', 'green', 'blue', 'purple', 'mustard']),
+  rug: new Set(['red', 'blue', 'green', 'purple']),
+};
 const AGENT_ID = /^(hermes|dog|job:[A-Za-z0-9_][A-Za-z0-9_.-]{0,63})$/;
 const FAILED = new Set(['error', 'failed', 'failure']);
 
@@ -148,7 +161,7 @@ function levelOf(xp) {
 }
 
 function loadStore() {
-  const empty = { version: 1, initialized: false, agents: {}, skills: {} };
+  const empty = { version: 1, initialized: false, agents: {}, skills: {}, decor: {} };
   try {
     const saved = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
     if (saved && typeof saved === 'object') return { ...empty, ...saved };
@@ -254,7 +267,9 @@ function cleanLook(look) {
   for (const k of ['skin', 'hair', 'shirt', 'pants']) {
     if (/^#[0-9a-fA-F]{6}$/.test(look[k] || '')) out[k] = look[k].toLowerCase();
   }
-  if (STYLES.has(look.style)) out.style = look.style;
+  for (const [k, allowed] of Object.entries(LOOK_CHOICES)) {
+    if (allowed.has(look[k])) out[k] = look[k];
+  }
   if (typeof look.glasses === 'boolean') out.glasses = look.glasses;
   return Object.keys(out).length ? out : null;
 }
@@ -303,14 +318,34 @@ async function valleyState(req, res) {
     jobs,
     running: (status && status.status === 200 && status.data && status.data.running) || {},
     agents: publicAgents(),
+    decor: store.decor || {},
     events,
   });
 }
 
-async function valleySaveAgent(req, res) {
+// Answers the request and returns false unless the caller is logged in to Hermes.
+async function requireLogin(req, res) {
   const auth = await upstreamJson('/api/auth/status', req.headers.cookie);
-  if (auth.status !== 200 || !auth.data) return sendJson(res, 502, { error: 'Hermes is not answering right now' });
-  if (auth.data.auth_enabled && !auth.data.logged_in) return sendJson(res, 401, { error: 'Authentication required' });
+  if (auth.status !== 200 || !auth.data) { sendJson(res, 502, { error: 'Hermes is not answering right now' }); return false; }
+  if (auth.data.auth_enabled && !auth.data.logged_in) { sendJson(res, 401, { error: 'Authentication required' }); return false; }
+  return true;
+}
+
+async function valleySaveDecor(req, res) {
+  if (!(await requireLogin(req, res))) return;
+  const body = await readJson(req);
+  if (!body || typeof body !== 'object') return sendJson(res, 400, { error: 'bad decor' });
+  const decor = {};
+  for (const [k, allowed] of Object.entries(DECOR)) {
+    if (allowed.has(body[k])) decor[k] = body[k];
+  }
+  store.decor = decor;
+  saveStore();
+  sendJson(res, 200, { ok: true, decor });
+}
+
+async function valleySaveAgent(req, res) {
+  if (!(await requireLogin(req, res))) return;
   const body = await readJson(req);
   if (!body || typeof body.id !== 'string' || !AGENT_ID.test(body.id)) return sendJson(res, 400, { error: 'unknown agent' });
   const r = recOf(body.id);
@@ -386,6 +421,7 @@ const server = http.createServer((req, res) => {
     if (rejectCrossOrigin(req, res)) return;
     if (url.pathname === '/api/valley/state' && req.method === 'GET') return run(valleyState, req, res);
     if (url.pathname === '/api/valley/agent' && req.method === 'POST') return run(valleySaveAgent, req, res);
+    if (url.pathname === '/api/valley/decor' && req.method === 'POST') return run(valleySaveDecor, req, res);
     if (!API_ALLOW.has(url.pathname)) return sendJson(res, 404, { error: 'not found' });
     return proxy(req, res, url);
   }

@@ -49,6 +49,7 @@
       <div class="clock-gold" id="clock-gold"></div>
     </div>
   </div>
+  <button id="btn-decor" class="icon-btn decor-btn" type="button" aria-label="Decorate the office">🎨</button>
   <button id="office-toggle" class="icon-btn office-toggle" type="button" aria-label="Resize the office">⤢</button>
 
   <section class="chat" aria-label="Chat with Hermes">
@@ -104,6 +105,13 @@
   <h2 id="journal-title" class="drawer-title">Journal</h2>
   <div id="journal-list" class="journal-list"></div>
   <button id="btn-logout" class="btn btn-quiet" type="button">Leave the valley (log out)</button>
+</section>
+
+<section id="decor" class="dialog frame" role="dialog" aria-modal="true" aria-labelledby="decor-title" hidden>
+  <button class="close-x" type="button" data-close aria-label="Close">✕</button>
+  <h2 id="decor-title" class="decor-title">Decorate</h2>
+  <div id="decor-body" class="editor"></div>
+  <div id="decor-actions" class="card-actions"></div>
 </section>
 
 <section id="approval" class="dialog frame" role="alertdialog" aria-modal="true" aria-labelledby="approval-title" hidden>

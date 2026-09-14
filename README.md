@@ -7,7 +7,10 @@ couch when idle, sleep when paused, and drop their work in the shipping bin when
 A spotted office dog follows people around, and there are marigolds in the window boxes.
 
 - Tap an agent to see its schedule, level and last report, run or pause it, or **customize** it:
-  nickname, hair or hat, colors, glasses, or a quick-pick preset.
+  nickname, male or female body, hair or hat, shirt (T-shirt, stripes, hoodie, vest, shirt & tie,
+  overalls), bottoms (pants, shorts, skirt), colors, glasses, or a quick-pick preset.
+- Tap 🎨 to **decorate** the office: wallpaper (7), floor (4), desk/shelf wood (5), couch (5) and
+  rug (4). Changes preview live and are shared by every device once saved.
 - Agents earn **XP**: +50 when a skill they use is created or improved (Hermes earns it for every
   skill), +5 per finished run. Levels follow Stardew's curve (1–10).
 - The chat can be minimized to a floating button; it shows a badge when Hermes replies.
@@ -30,7 +33,9 @@ Login is the WebUI password (`HERMES_WEBUI_PASSWORD`).
 `GET /api/valley/state` returns the jobs, which ones are running, each agent's nickname/look/XP,
 and any XP earned since the last call. XP is worked out on the server by diffing each skill's
 `patch_count` and each job's `repeat.completed` (or `last_run_at`) against what it saw last time; the
-first sync only records a baseline. `POST /api/valley/agent` saves a nickname or look.
+first sync only records a baseline. `POST /api/valley/agent` saves a nickname or look, and
+`POST /api/valley/decor` saves the office decor (both check the Hermes login and only accept known
+values; the decor also comes back from `/api/valley/state`).
 
 Security notes:
 - Only the endpoints in `API_ALLOW` (server.js) plus the two `/api/valley/*` routes are reachable.

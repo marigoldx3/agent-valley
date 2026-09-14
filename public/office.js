@@ -75,17 +75,23 @@
   const SKIN = ['#f7d3ad', '#ecbc92', '#d49b6c', '#a86c46', '#7b4b2f'];
   const HAIR = ['#3b2314', '#6b3d1f', '#a0522d', '#e0b04a', '#1f1f2b', '#ece6d6', '#7a4fa0', '#2f6f58', '#c8452f', '#e86fa0'];
   const SHIRT = ['#3f78c0', '#3a6fd8', '#c0433f', '#4f9a45', '#d99a2b', '#8a5bbf', '#2f9e9e', '#d56d9a', '#e07b39', '#2b2b3a', '#e8e4d8'];
-  const PANTS = ['#3a3a5e', '#2b3a6b', '#4a3322', '#2b4a6b', '#55463a', '#2f4f3a'];
+  const PANTS = ['#3a3a5e', '#2b3a6b', '#4a3322', '#2b4a6b', '#55463a', '#2f4f3a', '#8a3a3a', '#6a4a8a'];
   const CHAIRS = ['#a33b2e', '#3e6a9e', '#4f8a3a', '#7a4fa0', '#3b3b4a'];
   const RANDOM_STYLES = ['short', 'long', 'bob', 'spiky', 'bun', 'straw', 'cap'];
   const STYLE_OPTIONS = [
     ['short', 'Short'], ['long', 'Long'], ['bob', 'Bob'], ['spiky', 'Spiky'], ['bun', 'Bun'],
     ['straw', 'Straw hat'], ['cap', 'Cap'], ['wizard', 'Wizard hat'], ['crown', 'Crown'], ['helm', 'Winged helm'], ['bald', 'Bald'],
   ];
+  const BODY_OPTIONS = [['masc', 'Male'], ['fem', 'Female']];
+  const TOP_OPTIONS = [['tee', 'T-shirt'], ['stripes', 'Stripes'], ['hoodie', 'Hoodie'], ['vest', 'Vest'], ['tie', 'Shirt & tie'], ['overalls', 'Overalls']];
+  const BOTTOM_OPTIONS = [['pants', 'Pants'], ['shorts', 'Shorts'], ['skirt', 'Skirt']];
 
   // Sprites are 12x18 and left/right symmetric: each row lists the left half only.
   const BODY = ['......', '...ooo', '..osss', '.ossss', '.ossss', '.ossss', '.ossss', '..osss',
     '..otts', '.otttt', 'otTttt', 'otTttt', 'ostttt', '.okkkk'];
+  // Female: narrower shoulders, a cinched waist and wider hips.
+  const BODY_FEM = ['......', '...ooo', '..osss', '.ossss', '.ossss', '.ossss', '.ossss', '..osss',
+    '..otts', '..ottt', '.otTtt', '.otTtt', '.osott', '.okkkk'];
   const HAIRS = {
     short: ['...ooo', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...'],
     long: ['...ooo', '..ohhh', '.ohhhh', '.ohhhh', '.ohhhh', '.oh...', '.oh...', '.oh...', 'oh....'],
@@ -102,14 +108,23 @@
 
   function baseLook(id) {
     if (id === 'hermes') {
-      return { skin: SKIN[0], hair: '#e0b04a', shirt: '#3a6fd8', pants: '#2b3a6b', belt: '#f2c14e', style: 'helm', blush: true, glasses: false, cap: shade('#3a6fd8', 0.8), chair: '#c9962b' };
+      return {
+        skin: SKIN[0], hair: '#e0b04a', shirt: '#3a6fd8', pants: '#2b3a6b', belt: '#f2c14e', style: 'helm', blush: true, glasses: false,
+        cap: shade('#3a6fd8', 0.8), chair: '#c9962b', body: 'masc', top: 'tee', bottom: 'pants',
+      };
     }
     const r = seeded(hash(id));
     const shirt = pick(SHIRT.slice(0, 9), r());
-    return {
-      skin: pick(SKIN, r()), hair: pick(HAIR.slice(0, 9), r()), shirt, pants: pick(PANTS, r()), belt: '#5a3a1a',
+    const L = {
+      skin: pick(SKIN, r()), hair: pick(HAIR.slice(0, 9), r()), shirt, pants: pick(PANTS.slice(0, 6), r()), belt: '#5a3a1a',
       style: pick(RANDOM_STYLES, r()), blush: r() < 0.5, glasses: false, cap: shade(shirt, 0.8), chair: pick(CHAIRS, r()),
     };
+    // Drawn after the older fields so existing agents keep their colors.
+    L.body = r() < 0.5 ? 'fem' : 'masc';
+    L.top = pick(['tee', 'tee', 'stripes', 'hoodie', 'vest', 'tie', 'overalls'], r());
+    const b = r();
+    L.bottom = L.body === 'fem' && b < 0.4 ? 'skirt' : b > 0.8 ? 'shorts' : 'pants';
+    return L;
   }
 
   // A saved look only overrides the fields the person picked.
@@ -123,17 +138,62 @@
 
   function colorMap(L) {
     return {
-      o: OUT, s: L.skin, h: L.hair, t: L.shirt, T: shade(L.shirt, 0.78), k: L.belt, y: '#eac35c', r: '#c0392b',
-      c: L.cap, C: shade(L.cap, 0.72), g: '#f2c14e', w: '#ffffff',
+      o: OUT, s: L.skin, h: L.hair, t: L.shirt, T: shade(L.shirt, 0.78), V: shade(L.shirt, 0.52), k: L.belt, p: L.pants,
+      y: '#eac35c', r: '#c0392b', c: L.cap, C: shade(L.cap, 0.72), g: '#f2c14e', w: '#ffffff',
     };
   }
 
+  // Body template for the chosen shape, with the shirt style painted onto it.
+  function bodyRows(L) {
+    const rows = (L.body === 'fem' ? BODY_FEM : BODY).slice();
+    const put = (r, c, ch, only = 'tTs') => {
+      if (only.includes(rows[r][c])) rows[r] = rows[r].slice(0, c) + ch + rows[r].slice(c + 1);
+    };
+    switch (L.top) {
+      case 'stripes':
+        for (const r of [9, 11]) for (let c = 0; c < 6; c++) put(r, c, 'T', 'tT');
+        break;
+      case 'hoodie':
+        for (let c = 1; c < 6; c++) put(8, c, c === 1 ? 'o' : 'T', '.tTs');
+        put(9, 4, 'w', 'tT');
+        for (let c = 3; c < 6; c++) put(12, c, 'T', 'tT');
+        break;
+      case 'vest':
+        for (let r = 9; r <= 12; r++) for (const c of [3, 4]) put(r, c, 'V', 'tT');
+        break;
+      case 'tie':
+        put(8, 4, 'w', 'tT');
+        for (let r = 8; r <= 11; r++) put(r, 5, 'r');
+        break;
+      case 'overalls':
+        put(9, 4, 'p', 'tT');
+        for (let r = 10; r <= 12; r++) for (const c of [4, 5]) put(r, c, 'p', 'tT');
+        put(10, 4, 'y', 'p');
+        rows[13] = rows[13].replace(/k/g, 'p');
+        break;
+      default:
+        break;
+    }
+    return rows;
+  }
+
   function legs(L, lift) {
+    const boot = '#5a3218';
+    if (L.bottom === 'skirt') {
+      R(1, 14, 10, 1, OUT); R(2, 14, 8, 1, L.pants);
+      R(0, 15, 12, 1, OUT); R(1, 15, 10, 1, shade(L.pants, 0.85));
+      for (const [x0, up] of [[3, lift < 0], [7, lift > 0]]) {
+        if (up) { R(x0 - 1, 16, 4, 1, OUT); R(x0, 16, 2, 1, boot); }
+        else { R(x0 - 1, 16, 4, 2, OUT); R(x0, 16, 2, 1, L.skin); R(x0, 17, 2, 1, boot); }
+      }
+      return;
+    }
     for (const [x0, up] of [[1, lift < 0], [6, lift > 0]]) {
       const h = up ? 3 : 4;
       R(x0, 14, 5, h, OUT);
-      R(x0 + 1, 14, 3, h - 2, L.pants);
-      R(x0 + 1, 14 + h - 2, 3, 1, '#5a3218');
+      R(x0 + 1, 14, 3, 1, L.pants);
+      R(x0 + 1, 15, 3, h - 3, L.bottom === 'shorts' ? L.skin : L.pants);
+      R(x0 + 1, 14 + h - 2, 3, 1, boot);
     }
   }
 
@@ -144,7 +204,7 @@
       c.width = 12; c.height = 18;
       const prev = g;
       g = c.getContext('2d');
-      stamp(BODY.map(mirror), 0, 0, colors);
+      stamp(bodyRows(L).map(mirror), 0, 0, colors);
       stamp((HAIRS[L.style] || HAIRS.short).map(mirror), 0, 0, colors);
       legs(L, lift);
       g = prev;
@@ -163,7 +223,9 @@
     } else {
       R(x + 4, y + 5, 1, 1, '#2a1a10');
       R(x + 7, y + 5, 1, 1, '#2a1a10');
+      if (L.body === 'fem') { R(x + 3, y + 4, 1, 1, '#2a1a10'); R(x + 8, y + 4, 1, 1, '#2a1a10'); }
     }
+    if (L.body === 'fem') R(x + 5, y + 7, 2, 1, '#d9776f');
     if (L.glasses) {
       R(x + 3, y + 5, 1, 1, '#2a2a3a'); R(x + 5, y + 5, 2, 1, '#2a2a3a'); R(x + 8, y + 5, 1, 1, '#2a2a3a');
     }
@@ -220,6 +282,137 @@
       else R(x, y, 1, 1, p.color);
     }
     g.globalAlpha = 1;
+  }
+
+  /* ---------- decor: wallpaper, floor, furniture wood, couch and rug ---------- */
+
+  const WALLS = {
+    cream: { label: 'Cream stripes', pattern: 'stripes', a: '#e6d3a8', b: '#dcc596', dot: '#c9ae7e', wain: '#7a4424' },
+    mint: { label: 'Mint garden', pattern: 'flowers', a: '#d3ead7', b: '#c4e0ca', dot: '#e892a8', wain: '#5e7a52' },
+    rose: { label: 'Rose dots', pattern: 'dots', a: '#f3d6d8', b: '#ebc8cc', dot: '#d08a96', wain: '#8a4a5a' },
+    sky: { label: 'Blue plaid', pattern: 'plaid', a: '#d2e2f2', b: '#bcd0e8', dot: '#8fadd6', wain: '#3e5a7a' },
+    brick: { label: 'Brick', pattern: 'brick', a: '#b5553f', b: '#a64b37', dot: '#dccab4', wain: '#4a3a32' },
+    cabin: { label: 'Log cabin', pattern: 'logs', a: '#a8673a', b: '#9a5c32', dot: '#6e3a18', wain: '#5e3518' },
+    night: { label: 'Starry night', pattern: 'stars', a: '#26304f', b: '#222a47', dot: '#f2e6a0', wain: '#3a2a4a' },
+  };
+  const FLOORS = {
+    oak: { label: 'Oak planks', tones: ['#a8652f', '#9c5b29', '#b06c33'], seam: '#7d4520' },
+    walnut: { label: 'Walnut', tones: ['#6e3f22', '#643a1f', '#784626'], seam: '#4a2814' },
+    birch: { label: 'Birch', tones: ['#d7b384', '#cfa978', '#dfbd8f'], seam: '#b08a5c' },
+    tiles: { label: 'Checker tiles', pattern: 'checker', a: '#ece6d4', b: '#b9c7cc', seam: '#8a9498' },
+  };
+  const WOODS = {
+    oak: { label: 'Oak', body: '#9a5627', top: '#c98646', hi: '#e0a060', edge: '#6e3a18', drawer: '#b06a33' },
+    walnut: { label: 'Walnut', body: '#5e3518', top: '#83502c', hi: '#9c6a42', edge: '#3f210e', drawer: '#704122' },
+    birch: { label: 'Birch', body: '#c49a62', top: '#e3c28e', hi: '#f2d9ab', edge: '#9a7444', drawer: '#d3ad76' },
+    white: { label: 'Painted white', body: '#cfcfc6', top: '#efefe7', hi: '#ffffff', edge: '#9a9a90', drawer: '#dcdcd2' },
+    mint: { label: 'Painted mint', body: '#4f9a82', top: '#7cc7ab', hi: '#a8e6cd', edge: '#35705c', drawer: '#62ae94' },
+  };
+  const COUCHES = {
+    red: { label: 'Red', main: '#b5473a', dark: '#8e3228', light: '#d0634f' },
+    green: { label: 'Green', main: '#4f8a3a', dark: '#3a6a2a', light: '#6fae55' },
+    blue: { label: 'Blue', main: '#3e6a9e', dark: '#2c4f7a', light: '#5a88c0' },
+    purple: { label: 'Purple', main: '#7a4fa0', dark: '#5a3a78', light: '#9a6fc0' },
+    mustard: { label: 'Mustard', main: '#d9a13f', dark: '#b07f2a', light: '#f0c060' },
+  };
+  const RUGS = {
+    red: { label: 'Red', outer: '#7a2b2b', inner: '#b8483a', accent: '#e8b04a' },
+    blue: { label: 'Blue', outer: '#26386e', inner: '#3f5fb8', accent: '#e8d8b0' },
+    green: { label: 'Green', outer: '#2b5a2b', inner: '#4f8a3a', accent: '#f0c060' },
+    purple: { label: 'Purple', outer: '#4a2b5a', inner: '#7a4fa0', accent: '#f2c14e' },
+  };
+  const DECOR_SETS = { wall: WALLS, floor: FLOORS, wood: WOODS, couch: COUCHES, rug: RUGS };
+  const DEFAULT_DECOR = { wall: 'cream', floor: 'oak', wood: 'oak', couch: 'red', rug: 'red' };
+
+  function normalizeDecor(d) {
+    const out = {};
+    for (const [k, set] of Object.entries(DECOR_SETS)) out[k] = d && set[d[k]] ? d[k] : DEFAULT_DECOR[k];
+    return out;
+  }
+  const wood = () => WOODS[S.decor.wood];
+
+  function paintWall(x0, y0, w, h, th) {
+    R(x0, y0, w, h, th.a);
+    const x1 = x0 + w, y1 = y0 + h;
+    switch (th.pattern) {
+      case 'stripes':
+        for (let x = x0 + 4; x < x1; x += 8) R(x, y0, 4, h, th.b);
+        for (let y = y0 + 7, i = 0; y < y1 - 2; y += 9, i++) for (let x = x0 + 2 + (i % 2) * 4; x < x1; x += 8) R(x, y, 1, 1, th.dot);
+        break;
+      case 'flowers':
+        for (let y = y0 + 5, i = 0; y < y1 - 3; y += 9, i++) {
+          for (let x = x0 + 4 + (i % 2) * 7; x < x1 - 2; x += 14) {
+            R(x, y - 1, 1, 1, th.dot); R(x - 1, y, 3, 1, th.dot); R(x, y + 1, 1, 1, th.dot);
+            R(x, y, 1, 1, '#f7e39a'); R(x + 1, y + 2, 1, 1, '#6fae55');
+          }
+        }
+        break;
+      case 'dots':
+        for (let y = y0 + 3, i = 0; y < y1 - 1; y += 6, i++) for (let x = x0 + 2 + (i % 2) * 4; x < x1; x += 8) R(x, y, 2, 2, th.dot);
+        break;
+      case 'plaid':
+        for (let x = x0 + 3; x < x1; x += 10) R(x, y0, 2, h, th.b);
+        for (let y = y0 + 4; y < y1; y += 10) R(x0, y, w, 2, th.b);
+        for (let x = x0 + 3; x < x1; x += 10) for (let y = y0 + 4; y < y1; y += 10) R(x, y, 2, 2, th.dot);
+        break;
+      case 'brick':
+        for (let y = y0, row = 0; y < y1; y += 5, row++) {
+          R(x0, y + 4, w, 1, th.dot);
+          for (let x = x0 + (row % 2) * 6; x < x1; x += 12) R(x, y, 1, 4, th.dot);
+          for (let x = x0 + 2 + (row % 2) * 6; x < x1; x += 24) R(x, y + 1, 4, 2, th.b);
+        }
+        break;
+      case 'logs':
+        for (let y = y0, row = 0; y < y1; y += 6, row++) {
+          R(x0, y, w, 6, row % 2 ? th.b : th.a);
+          R(x0, y, w, 1, shade(th.a, 1.12));
+          R(x0, y + 5, w, 1, th.dot);
+          for (let x = x0 + 7 + (row % 3) * 11; x < x1; x += 33) R(x, y + 2, 2, 2, th.dot);
+        }
+        break;
+      case 'stars':
+        for (let i = 0; i < Math.floor((w * h) / 55); i++) {
+          const sx = x0 + ((i * 37 + (i >> 2) * 11) % w), sy = y0 + ((i * 17 + (i >> 3) * 5) % h);
+          R(sx, sy, 1, 1, i % 5 ? th.dot : '#ffffff');
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  function paintFloor(x0, y0, w, h, fl) {
+    g.save();
+    g.beginPath(); g.rect(x0, y0, w, h); g.clip();
+    if (fl.pattern === 'checker') {
+      for (let y = y0, r = 0; y < y0 + h; y += 8, r++) {
+        for (let x = x0, c = 0; x < x0 + w; x += 8, c++) {
+          R(x, y, 8, 8, (r + c) % 2 ? fl.b : fl.a);
+          R(x, y, 8, 1, 'rgba(255,255,255,0.18)');
+        }
+      }
+    } else {
+      for (let y = y0, row = 0; y < y0 + h; y += 6, row++) {
+        R(x0, y, w, 6, fl.tones[row % 3]);
+        R(x0, y + 5, w, 1, fl.seam);
+        for (let x = x0 + ((row * 19) % 40); x < x0 + w; x += 40) R(x, y, 1, 5, fl.seam);
+        R(x0, y, w, 1, 'rgba(255,220,160,0.10)');
+      }
+    }
+    g.restore();
+  }
+
+  function paintRug(rx, ry, rw, rh, rug) {
+    R(rx, ry, rw, rh, rug.outer);
+    R(rx + 2, ry + 2, rw - 4, rh - 4, rug.inner);
+    R(rx + 4, ry + 4, rw - 8, 1, rug.accent); R(rx + 4, ry + rh - 5, rw - 8, 1, rug.accent);
+    R(rx + 4, ry + 4, 1, rh - 8, rug.accent); R(rx + rw - 5, ry + 4, 1, rh - 8, rug.accent);
+    const n = Math.max(1, Math.floor((rw - 20) / 12) + 1);
+    for (let i = 0; i < n; i++) {
+      const cx = rx + Math.round(rw / 2 - ((n - 1) * 12) / 2) + i * 12, cy = ry + Math.floor(rh / 2);
+      R(cx - 1, cy - 3, 3, 7, rug.accent); R(cx - 3, cy - 1, 7, 3, rug.accent); R(cx, cy - 1, 1, 3, rug.outer); R(cx - 1, cy, 3, 1, rug.outer);
+    }
+    for (let i = rx; i < rx + rw; i += 2) { R(i, ry - 1, 1, 1, '#e8d8b0'); R(i, ry + rh, 1, 1, '#e8d8b0'); }
   }
 
   /* ---------- marigolds ---------- */
@@ -334,12 +527,13 @@
   }
 
   function drawBookshelf(x, y) {
-    box(x, y, 24, 34, '#6e3a18');
+    const wd = wood();
+    box(x, y, 24, 34, wd.edge);
     S.books.forEach((books, s) => {
       const sy = y + 2 + s * 11;
       R(x + 2, sy, 20, 9, '#3f200d');
       for (const b of books) if (b.x + b.w <= 20) { R(x + 2 + b.x, sy + 9 - b.h, b.w, b.h, b.c); R(x + 2 + b.x, sy + 9 - b.h, 1, b.h, shade(b.c, 1.2)); }
-      R(x + 1, sy + 9, 22, 2, '#8a4f24');
+      R(x + 1, sy + 9, 22, 2, wd.body);
     });
   }
 
@@ -366,17 +560,17 @@
     box(x + 2, base - 8, 9, 8, '#b5552b'); R(x + 2, base - 8, 9, 2, '#d0703a'); R(x + 2, base - 8, 9, 1, OUT);
   }
 
-  const COUCH = '#b5473a', COUCH_D = '#8e3228', COUCH_L = '#d0634f';
   function drawCouch(t) {
     const { x, y } = S.couch;
-    box(x, y, 46, 14, COUCH); R(x + 2, y + 2, 42, 1, COUCH_L); R(x + 3, y + 10, 40, 4, COUCH_D);
-    R(x + 22, y + 3, 1, 7, COUCH_D);
+    const cc = COUCHES[S.decor.couch];
+    box(x, y, 46, 14, cc.main); R(x + 2, y + 2, 42, 1, cc.light); R(x + 3, y + 10, 40, 4, cc.dark);
+    R(x + 22, y + 3, 1, 7, cc.dark);
     for (const a of S.agents.values()) {
       if (a.pose && a.pose.couch != null) drawCharAt(a, S.seats[a.pose.couch].x - 6, y - 4, 'stand', t);
     }
-    box(x - 3, y + 6, 7, 18, COUCH); R(x - 2, y + 7, 5, 1, COUCH_L);
-    box(x + 42, y + 6, 7, 18, COUCH); R(x + 43, y + 7, 5, 1, COUCH_L);
-    box(x, y + 14, 46, 10, COUCH_D); R(x + 1, y + 14, 44, 2, COUCH);
+    box(x - 3, y + 6, 7, 18, cc.main); R(x - 2, y + 7, 5, 1, cc.light);
+    box(x + 42, y + 6, 7, 18, cc.main); R(x + 43, y + 7, 5, 1, cc.light);
+    box(x, y + 14, 46, 10, cc.dark); R(x + 1, y + 14, 44, 2, cc.main);
     R(x + 1, y + 24, 2, 2, OUT); R(x + 43, y + 24, 2, 2, OUT);
   }
 
@@ -393,10 +587,11 @@
 
   function drawCounter() {
     const { x, base } = S.counter;
+    const wd = wood();
     const y = base - 16;
-    box(x, y, 42, 16, '#8a4f24');
-    R(x + 1, y + 1, 40, 3, '#c98646'); R(x + 1, y + 1, 40, 1, '#e0a060'); R(x + 1, y + 4, 40, 1, '#6e3a18');
-    box(x + 3, y + 6, 17, 9, '#9a5627'); box(x + 22, y + 6, 17, 9, '#9a5627');
+    box(x, y, 42, 16, wd.body);
+    R(x + 1, y + 1, 40, 3, wd.top); R(x + 1, y + 1, 40, 1, wd.hi); R(x + 1, y + 4, 40, 1, wd.edge);
+    box(x + 3, y + 6, 17, 9, wd.drawer); box(x + 22, y + 6, 17, 9, wd.drawer);
     R(x + 17, y + 10, 1, 2, '#f2c14e'); R(x + 24, y + 10, 1, 2, '#f2c14e');
     box(x + 6, y - 13, 11, 14, '#4a4a55'); R(x + 7, y - 12, 9, 3, '#6a6a78');
     R(x + 9, y - 6, 5, 5, OUT); R(x + 10, y - 5, 3, 4, '#6b3d1f');
@@ -405,20 +600,24 @@
     R(x + 34, y - 3, 6, 3, OUT); R(x + 35, y - 3, 4, 2, '#f2c14e'); R(x + 36, y - 4, 2, 1, '#c0433f');
   }
 
+  function deskBody(x, y, wd, gold) {
+    box(x, y, 30, 14, wd.body);
+    R(x + 1, y + 1, 28, 4, wd.top); R(x + 1, y + 1, 28, 1, wd.hi); R(x + 1, y + 5, 28, 1, wd.edge);
+    box(x + 3, y + 7, 10, 6, wd.drawer); box(x + 17, y + 7, 10, 6, wd.drawer);
+    R(x + 7, y + 9, 2, 1, '#f2c14e'); R(x + 21, y + 9, 2, 1, '#f2c14e');
+    R(x + 1, y + 14, 2, 2, OUT); R(x + 27, y + 14, 2, 2, OUT);
+    if (gold) R(x + 1, y + 1, 28, 1, '#f2c14e');
+  }
+
   function drawDeskUnit(d, t) {
     const a = d.agent && d.agent.seated && d.agent.deskIndex === d.i ? d.agent : null;
-    const x = d.cx - 15, y = d.ty;
+    const y = d.ty;
     const chair = d.agent ? d.agent.look.chair : '#7a4424';
     box(d.cx - 8, y - 9, 16, 12, chair); R(d.cx - 7, y - 8, 14, 1, shade(chair, 1.3));
     const working = !!(a && a.want.working);
     if (a) drawCharAt(a, d.cx - 6, y - 11 + (working ? Math.floor(t * 4 + a.phase) % 2 : 0), 'stand', t);
 
-    box(x, y, 30, 14, '#9a5627');
-    R(x + 1, y + 1, 28, 4, '#c98646'); R(x + 1, y + 1, 28, 1, '#e0a060'); R(x + 1, y + 5, 28, 1, '#6e3a18');
-    box(x + 3, y + 7, 10, 6, '#b06a33'); box(x + 17, y + 7, 10, 6, '#b06a33');
-    R(x + 7, y + 9, 2, 1, '#f2c14e'); R(x + 21, y + 9, 2, 1, '#f2c14e');
-    R(x + 1, y + 14, 2, 2, OUT); R(x + 27, y + 14, 2, 2, OUT);
-    if (d.gold) R(x + 1, y + 1, 28, 1, '#f2c14e');
+    deskBody(d.cx - 15, y, wood(), d.gold);
 
     // laptop, seen from behind, on the left of the desk
     const lx = d.cx - 14, ly = y - 5;
@@ -519,7 +718,7 @@
   /* ---------- layout & movement ---------- */
 
   const S = {
-    agents: new Map(), desks: [], pois: [], corridors: [], particles: [], notes: [],
+    agents: new Map(), desks: [], pois: [], corridors: [], particles: [], notes: [], decor: normalizeDecor(null),
     H: 200, LT: 150, scale: 1, now: 0, last: 0, binOpenUntil: 0, dark: 0, coffeeBusy: false,
   };
 
@@ -557,38 +756,25 @@
     S.canvas.height = S.H;
     S.bg = document.createElement('canvas');
     S.bg.width = W; S.bg.height = S.H;
-    const prev = g;
-    g = S.bg.getContext('2d');
-    drawRoomShell();
-    g = prev;
+    paintShell();
     resize();
   }
 
-  function drawRoomShell() {
-    for (let x = 0; x < W; x += 8) { R(x, 0, 4, 36, '#e6d3a8'); R(x + 4, 0, 4, 36, '#dcc596'); }
-    for (let y = 7; y < 34; y += 9) for (let x = 2 + ((y / 9) % 2) * 4; x < W; x += 8) R(x, y, 1, 1, '#c9ae7e');
+  // The static room (walls, floor, rug) is cached; it's repainted when the layout or decor changes.
+  function paintShell() {
+    if (!S.bg) return;
+    const prev = g;
+    g = S.bg.getContext('2d');
+    const th = WALLS[S.decor.wall];
+    paintWall(0, 0, W, 36, th);
     R(0, 0, W, 3, '#5b2d0f');
-    R(0, 36, W, 2, '#8a4a22');
-    R(0, 38, W, 16, '#7a4424');
-    for (let x = 0; x < W; x += 16) { R(x, 38, 1, 16, '#6a3a1e'); R(x + 1, 38, 1, 16, '#8f5530'); }
-    R(0, 54, W, 4, '#4a2512');
-    const tones = ['#a8652f', '#9c5b29', '#b06c33'];
-    for (let y = WALL_H, row = 0; y < S.H; y += 6, row++) {
-      R(0, y, W, 6, tones[row % 3]);
-      R(0, y + 5, W, 1, '#7d4520');
-      for (let x = (row * 19) % 40; x < W; x += 40) R(x, y, 1, 5, '#7d4520');
-      R(0, y, W, 1, 'rgba(255,220,160,0.10)');
-    }
-    const rx = 76, ry = S.LT + 8, rw = 80, rh = 44;
-    R(rx, ry, rw, rh, '#7a2b2b');
-    R(rx + 2, ry + 2, rw - 4, rh - 4, '#b8483a');
-    R(rx + 4, ry + 4, rw - 8, 1, '#e8b04a'); R(rx + 4, ry + rh - 5, rw - 8, 1, '#e8b04a');
-    R(rx + 4, ry + 4, 1, rh - 8, '#e8b04a'); R(rx + rw - 5, ry + 4, 1, rh - 8, '#e8b04a');
-    for (let i = 0; i < 5; i++) {
-      const cx = rx + 16 + i * 12, cy = ry + rh / 2;
-      R(cx - 1, cy - 3, 3, 7, '#e8b04a'); R(cx - 3, cy - 1, 7, 3, '#e8b04a'); R(cx, cy - 1, 1, 3, '#7a2b2b'); R(cx - 1, cy, 3, 1, '#7a2b2b');
-    }
-    for (let i = rx; i < rx + rw; i += 2) { R(i, ry - 1, 1, 1, '#e8d8b0'); R(i, ry + rh, 1, 1, '#e8d8b0'); }
+    R(0, 36, W, 2, shade(th.wain, 1.13));
+    R(0, 38, W, 16, th.wain);
+    for (let x = 0; x < W; x += 16) { R(x, 38, 1, 16, shade(th.wain, 0.87)); R(x + 1, 38, 1, 16, shade(th.wain, 1.17)); }
+    R(0, 54, W, 4, shade(th.wain, 0.6));
+    paintFloor(0, WALL_H, W, S.H - WALL_H, FLOORS[S.decor.floor]);
+    paintRug(76, S.LT + 8, 80, 44, RUGS[S.decor.rug]);
+    g = prev;
   }
 
   function resize() {
@@ -806,6 +992,45 @@
     S.notes = list.filter((x) => x.id !== 'hermes').map((x) => ({
       color: x.working ? '#b5ec8a' : x.paused ? '#d9d2c0' : x.error ? '#f4a09a' : '#fbe9a0',
     }));
+  }
+
+  function setDecor(decor) {
+    const next = normalizeDecor(decor);
+    if (JSON.stringify(next) === JSON.stringify(S.decor)) return;
+    S.decor = next;
+    paintShell();
+  }
+
+  // Small swatch canvases for the Decorate panel.
+  function previewDecor(canvas, kind, key) {
+    const prev = g;
+    canvas.width = 32; canvas.height = 20;
+    g = canvas.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const floor = FLOORS[S.decor.floor];
+    if (kind === 'wall') {
+      const th = WALLS[key];
+      paintWall(0, 0, 32, 13, th);
+      R(0, 13, 32, 1, shade(th.wain, 1.13)); R(0, 14, 32, 6, th.wain);
+      for (let x = 0; x < 32; x += 8) R(x, 14, 1, 6, shade(th.wain, 0.87));
+    } else if (kind === 'floor') {
+      paintFloor(0, 0, 32, 20, FLOORS[key]);
+    } else if (kind === 'wood') {
+      paintFloor(0, 0, 32, 20, floor);
+      const wd = WOODS[key];
+      box(3, 4, 26, 12, wd.body); R(4, 5, 24, 3, wd.top); R(4, 5, 24, 1, wd.hi); R(4, 8, 24, 1, wd.edge);
+      box(6, 10, 8, 5, wd.drawer); box(18, 10, 8, 5, wd.drawer); R(9, 12, 2, 1, '#f2c14e'); R(21, 12, 2, 1, '#f2c14e');
+    } else if (kind === 'couch') {
+      paintFloor(0, 0, 32, 20, floor);
+      const cc = COUCHES[key];
+      box(5, 4, 22, 9, cc.main); R(6, 5, 20, 1, cc.light);
+      box(3, 8, 5, 9, cc.main); box(24, 8, 5, 9, cc.main);
+      box(5, 11, 22, 6, cc.dark); R(6, 11, 20, 1, cc.main);
+    } else if (kind === 'rug') {
+      paintFloor(0, 0, 32, 20, floor);
+      paintRug(3, 3, 26, 14, RUGS[key]);
+    }
+    g = prev;
   }
 
   function updateTag(a) {
@@ -1080,16 +1305,27 @@
     return () => cancelAnimationFrame(raf);
   }
 
+  const optionsOf = (set) => Object.entries(set).map(([k, v]) => [k, v.label]);
+
   window.Office = {
     init,
     setAgents,
+    setDecor,
+    previewDecor,
     drawPortrait,
     title,
     floatText,
     levelUp,
     petDog,
     defaultLook: (id) => baseLook(id),
-    palette: { skin: SKIN, hair: HAIR, shirt: SHIRT, pants: PANTS, styles: STYLE_OPTIONS },
+    defaultDecor: () => Object.assign({}, DEFAULT_DECOR),
+    palette: {
+      skin: SKIN, hair: HAIR, shirt: SHIRT, pants: PANTS,
+      styles: STYLE_OPTIONS, bodies: BODY_OPTIONS, tops: TOP_OPTIONS, bottoms: BOTTOM_OPTIONS,
+    },
+    decorOptions: {
+      wall: optionsOf(WALLS), floor: optionsOf(FLOORS), wood: optionsOf(WOODS), couch: optionsOf(COUCHES), rug: optionsOf(RUGS),
+    },
     emote(id, icon) { const a = S.agents.get(id); if (a) emote(a, icon); },
     pulse(id, kind) {
       const a = S.agents.get(id);

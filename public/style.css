@@ -187,7 +187,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .clock-date { font-weight: 700; font-size: 14px; border-bottom: 2px solid var(--wood-light); padding-bottom: 2px; }
 .clock-time { font-size: 14px; padding: 2px 0; white-space: nowrap; }
 .clock-gold { font-size: 11px; background: #f7c85c; border: 2px solid var(--wood-dark); border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
-.office-toggle { position: absolute; left: 6px; top: calc(6px + env(safe-area-inset-top)); z-index: 3; width: 34px; height: 34px; font-size: 16px; }
+.decor-btn { position: absolute; left: 6px; top: calc(6px + env(safe-area-inset-top)); z-index: 3; width: 34px; height: 34px; font-size: 16px; }
+.office-toggle { position: absolute; left: 46px; top: calc(6px + env(safe-area-inset-top)); z-index: 3; width: 34px; height: 34px; font-size: 16px; }
 
 .chat {
   position: relative;
@@ -470,6 +471,28 @@ button, input, textarea { font: inherit; color: inherit; }
 .swatch.on { outline: 3px solid #f3b04e; outline-offset: 1px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
 .toggle input { width: 20px; height: 20px; accent-color: #5ba044; }
+
+/* ---------- decorating ---------- */
+
+.backdrop.clear { background: transparent; }
+#decor { max-height: min(50%, calc(var(--app-h) - 24px)); }
+/* While decorating, pin the room to the top so the panel doesn't cover it. */
+.app.decorating .office-stage { margin: 0 auto auto; }
+.decor-title { margin: 0 0 8px; font-size: 22px; }
+.decor-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.decor-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 78px;
+  padding: 4px 3px;
+  font-size: 11px; line-height: 1.1; text-align: center;
+  background: var(--parch-2);
+  border: 2px solid #d9a95e;
+  border-radius: 5px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.decor-opt canvas { display: block; width: 64px; height: 40px; border: 2px solid var(--night); border-radius: 3px; image-rendering: pixelated; image-rendering: crisp-edges; }
+.decor-opt.on { background: #f3b04e; border-color: var(--wood-dark); font-weight: 700; }
 
 /* ---------- minimized chat ---------- */
 

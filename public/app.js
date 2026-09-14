@@ -32,6 +32,8 @@
     draft: null,
     chatMin: false,
     unread: 0,
+    decor: {},
+    decorDraft: null,
   };
 
   /* ---------- API ---------- */
@@ -159,6 +161,11 @@
       state.jobs = Array.isArray(data.jobs) ? data.jobs : [];
       state.running = data.running || {};
       state.valley = data.agents || {};
+      const decor = data.decor || {};
+      if (!state.decorDraft && JSON.stringify(decor) !== JSON.stringify(state.decor)) {
+        state.decor = decor;
+        Office.setDecor(decor);
+      }
       syncAgents();
       showProgress(data.events || []);
       setOffline(false);
@@ -834,20 +841,24 @@
 
   /* ---------- customizing an agent: nickname and sprite ---------- */
 
+  // Presets change clothes and hair but leave the body shape and skin alone.
   const PRESETS = [
-    ['Farmer', { style: 'straw', shirt: '#4f9a45', pants: '#2b4a6b', hair: '#6b3d1f', glasses: false }],
-    ['Wizard', { style: 'wizard', shirt: '#8a5bbf', pants: '#3a3a5e', hair: '#ece6d6', glasses: false }],
-    ['Royal', { style: 'crown', shirt: '#c0433f', pants: '#3a3a5e', hair: '#e0b04a', glasses: false }],
-    ['Messenger', { style: 'helm', shirt: '#3a6fd8', pants: '#2b3a6b', hair: '#e0b04a', glasses: false }],
-    ['Scholar', { style: 'bob', shirt: '#2f9e9e', pants: '#55463a', hair: '#3b2314', glasses: true }],
-    ['Rocker', { style: 'spiky', shirt: '#2b2b3a', pants: '#3a3a5e', hair: '#c8452f', glasses: false }],
+    ['Farmer', { style: 'straw', top: 'overalls', bottom: 'pants', shirt: '#e8e4d8', pants: '#2b4a6b', hair: '#6b3d1f', glasses: false }],
+    ['Wizard', { style: 'wizard', top: 'tee', bottom: 'skirt', shirt: '#8a5bbf', pants: '#6a4a8a', hair: '#ece6d6', glasses: false }],
+    ['Royal', { style: 'crown', top: 'vest', bottom: 'pants', shirt: '#c0433f', pants: '#3a3a5e', hair: '#e0b04a', glasses: false }],
+    ['Messenger', { style: 'helm', top: 'tee', bottom: 'shorts', shirt: '#3a6fd8', pants: '#2b3a6b', hair: '#e0b04a', glasses: false }],
+    ['Scholar', { style: 'bob', top: 'tie', bottom: 'pants', shirt: '#e8e4d8', pants: '#55463a', hair: '#3b2314', glasses: true }],
+    ['Rocker', { style: 'spiky', top: 'hoodie', bottom: 'pants', shirt: '#2b2b3a', pants: '#3a3a5e', hair: '#c8452f', glasses: false }],
   ];
-  const LOOK_KEYS = ['skin', 'hair', 'shirt', 'pants', 'style', 'glasses'];
+  const LOOK_KEYS = ['skin', 'hair', 'shirt', 'pants', 'style', 'glasses', 'body', 'top', 'bottom'];
 
   function randomLook() {
     const P = Office.palette;
     const any = (arr) => arr[Math.floor(Math.random() * arr.length)];
-    return { skin: any(P.skin), hair: any(P.hair), shirt: any(P.shirt), pants: any(P.pants), style: any(P.styles)[0], glasses: Math.random() < 0.25 };
+    return {
+      skin: any(P.skin), hair: any(P.hair), shirt: any(P.shirt), pants: any(P.pants), style: any(P.styles)[0],
+      top: any(P.tops)[0], bottom: any(P.bottoms)[0], glasses: Math.random() < 0.25,
+    };
   }
 
   function field(label, control) {
@@ -889,8 +900,21 @@
     });
     ed.append(field('Nickname', nick));
 
+    const chipRow = (key, options) => {
+      const row = el('div', 'chips');
+      for (const [value, label] of options) {
+        const b = el('button', 'chip-btn', label);
+        b.type = 'button';
+        b.addEventListener('click', () => { draft.look[key] = value; repaint(); });
+        refreshers.push(() => b.classList.toggle('on', draft.look[key] === value));
+        row.append(b);
+      }
+      return row;
+    };
+
     if (!isDog) {
       const P = Office.palette;
+      ed.append(field('Body', chipRow('body', P.bodies)));
       const presets = el('div', 'chips');
       for (const [label, look] of PRESETS) {
         const b = el('button', 'chip-btn', label);
@@ -904,15 +928,9 @@
       presets.append(dice);
       ed.append(field('Quick picks', presets));
 
-      const styles = el('div', 'chips');
-      for (const [key, label] of P.styles) {
-        const b = el('button', 'chip-btn', label);
-        b.type = 'button';
-        b.addEventListener('click', () => { draft.look.style = key; repaint(); });
-        refreshers.push(() => b.classList.toggle('on', draft.look.style === key));
-        styles.append(b);
-      }
-      ed.append(field('Hair or hat', styles));
+      ed.append(field('Hair or hat', chipRow('style', P.styles)));
+      ed.append(field('Shirt', chipRow('top', P.tops)));
+      ed.append(field('Bottoms', chipRow('bottom', P.bottoms)));
 
       for (const [key, label] of [['skin', 'Skin'], ['hair', 'Hair'], ['shirt', 'Shirt'], ['pants', 'Pants']]) {
         const row = el('div', 'swatches');
@@ -971,6 +989,59 @@
     renderCard(false);
   }
 
+  /* ---------- decorating the office ---------- */
+
+  const DECOR_PARTS = [['wall', 'Wallpaper'], ['floor', 'Floor'], ['wood', 'Desks & shelves'], ['couch', 'Couch'], ['rug', 'Rug']];
+
+  function openDecor() {
+    const draft = Object.assign(Office.defaultDecor(), state.decor);
+    state.decorDraft = draft;
+    const body = $('#decor-body');
+    body.textContent = '';
+    const previews = [];
+    const refreshers = [];
+    // Every pick repaints the room right away so you can see it behind the panel.
+    const apply = () => {
+      Office.setDecor(draft);
+      for (const [c, kind, key] of previews) Office.previewDecor(c, kind, key);
+      for (const fn of refreshers) fn();
+    };
+    for (const [kind, label] of DECOR_PARTS) {
+      const row = el('div', 'decor-row');
+      for (const [key, name] of Office.decorOptions[kind]) {
+        const b = el('button', 'decor-opt');
+        b.type = 'button';
+        b.setAttribute('aria-label', `${label}: ${name}`);
+        const c = el('canvas');
+        b.append(c, el('span', null, name));
+        b.addEventListener('click', () => { draft[kind] = key; apply(); });
+        refreshers.push(() => b.classList.toggle('on', draft[kind] === key));
+        previews.push([c, kind, key]);
+        row.append(b);
+      }
+      body.append(field(label, row));
+    }
+    const actions = $('#decor-actions');
+    actions.textContent = '';
+    actions.append(
+      button('Save', 'btn-go', async () => {
+        const res = await api('/api/valley/decor', { method: 'POST', body: draft });
+        state.decor = res.decor || { ...draft };
+        state.decorDraft = null;
+        hide($('#decor'));
+        Office.setDecor(state.decor);
+        toast('The office got a makeover!', 'good');
+      }),
+      button('Original look', '', async () => { Object.assign(draft, Office.defaultDecor()); apply(); }),
+      button('Cancel', 'btn-quiet', async () => hide($('#decor'))),
+    );
+    apply();
+    show($('#decor'));
+    $('#backdrop').classList.add('clear');
+    $('#app').classList.add('decorating');
+  }
+  $('#btn-decor').addEventListener('click', openDecor);
+
   /* ---------- approval ---------- */
 
   function showApproval(d) {
@@ -1003,12 +1074,21 @@
     closeOverlays(node);
     node.hidden = false;
     $('#backdrop').hidden = false;
+    $('#backdrop').classList.remove('clear');
     $('#backdrop').dataset.modal = modal ? '1' : '';
   }
   function hide(node) {
     node.hidden = true;
     if (node.id === 'agent-card') { state.cardId = null; state.cardMode = 'info'; state.draft = null; }
-    if (![...document.querySelectorAll('.dialog, .drawer')].some((n) => !n.hidden)) $('#backdrop').hidden = true;
+    // Closing the Decorate panel without saving puts the old decor back.
+    if (node.id === 'decor') {
+      $('#app').classList.remove('decorating');
+      if (state.decorDraft) { state.decorDraft = null; Office.setDecor(state.decor); }
+    }
+    if (![...document.querySelectorAll('.dialog, .drawer')].some((n) => !n.hidden)) {
+      $('#backdrop').hidden = true;
+      $('#backdrop').classList.remove('clear');
+    }
   }
   function closeOverlays(except) {
     document.querySelectorAll('.dialog, .drawer').forEach((n) => { if (n !== except && n.id !== 'approval') hide(n); });
