@@ -139,6 +139,7 @@
   function defaultName(id) {
     if (id === 'hermes') return 'Hermes';
     if (id === 'dog') return 'Pepper';
+    if (id === 'ferret') return 'Noodle';
     const j = jobFor(id);
     return (j && j.name) || 'Task';
   }
@@ -148,6 +149,7 @@
   }
   const lookOf = (id) => (state.valley[id] && state.valley[id].look) || null;
   const levelOf = (id) => (state.valley[id] && state.valley[id].level) || 0;
+  const isPet = (id) => id === 'dog' || id === 'ferret';
 
   // One poll loop only: callers (visibility, actions) may ask for an early poll while one is in flight.
   let polling = false;
@@ -237,15 +239,15 @@
 
   /* ---------- clock ---------- */
 
+  // California time, to match the wall clock in the office.
   function tickClock() {
-    const d = new Date();
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const season = ['❄️', '❄️', '🌸', '🌸', '🌸', '🌻', '🌻', '🌻', '🍂', '🍂', '🍂', '❄️'][d.getMonth()];
-    let h = d.getHours();
+    const pt = Office.pacificTime();
+    const season = ['❄️', '❄️', '🌸', '🌸', '🌸', '🌻', '🌻', '🌻', '🍂', '🍂', '🍂', '❄️'][pt.month];
+    let h = pt.hours;
     const ap = h < 12 ? 'am' : 'pm';
     h = h % 12 || 12;
-    const m = String(Math.floor(d.getMinutes() / 10) * 10).padStart(2, '0');
-    $('#clock-date').textContent = `${days[d.getDay()]}. ${d.getDate()}`;
+    const m = String(Math.floor(pt.minutes / 10) * 10).padStart(2, '0');
+    $('#clock-date').textContent = `${pt.weekday}. ${pt.day}`;
     $('#clock-icon').textContent = season;
     $('#clock-time').textContent = `${h}:${m} ${ap}`;
   }
@@ -747,8 +749,8 @@
   function renderLevel(id) {
     const box = $('#card-level');
     box.textContent = '';
-    box.hidden = id === 'dog';
-    if (id === 'dog') return;
+    box.hidden = isPet(id);
+    if (isPet(id)) return;
     const v = state.valley[id] || { xp: 0, level: 0, floor: 0, next: 100 };
     const pct = v.next ? ((v.xp - v.floor) / (v.next - v.floor)) * 100 : 100;
     box.append(el('span', 'level-badge', `Lv ${v.level || 0}`));
@@ -788,8 +790,18 @@
     if (id === 'dog') {
       if (fresh) typewriter(greet, `Woof! ${displayName('dog')} wags happily. Best dog in the valley.`);
       fact(facts, 'Breed', 'Spotted office dog');
-      fact(facts, 'Likes', 'Pets, following people around, naps on the rug');
+      fact(facts, 'Likes', 'Pets, following people around, chasing the mice, naps on the rug');
       actions.append(button('Pet', 'btn-go', async () => Office.petDog()), button('Rename', '', async () => openEditor()));
+      return;
+    }
+
+    if (id === 'ferret') {
+      if (fresh) typewriter(greet, `Dook dook! ${displayName('ferret')} does a happy little war dance around your feet.`);
+      const socks = Office.critterInfo().socks;
+      fact(facts, 'Breed', 'Sable ferret');
+      fact(facts, 'Likes', 'Stealing socks, war dances, cuddles, hiding in the shipping bin');
+      fact(facts, 'Sock stash', socks ? `${socks} ${socks === 1 ? 'sock' : 'socks'} (don't tell anyone)` : 'empty… for now');
+      actions.append(button('Pet', 'btn-go', async () => Office.petFerret()), button('Rename', '', async () => openEditor()));
       return;
     }
 
@@ -869,7 +881,7 @@
 
   function openEditor() {
     const id = state.cardId;
-    const isDog = id === 'dog';
+    const isDog = isPet(id); // pets only get a nickname
     const v = state.valley[id] || {};
     const base = Office.defaultLook(id);
     const draft = { nickname: v.nickname || '', look: {} };

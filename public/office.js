@@ -46,6 +46,21 @@
       .join('');
   }
 
+  // The office runs on California time wherever the page is opened: wall clock, sky and lighting.
+  const PACIFIC = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hourCycle: 'h23', weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+  });
+  let ptCache = null, ptAt = 0;
+  function pacificTime() {
+    const now = Date.now();
+    if (ptCache && now - ptAt < 1000) return ptCache;
+    const p = {};
+    for (const part of PACIFIC.formatToParts(new Date(now))) p[part.type] = part.value;
+    ptCache = { hours: Number(p.hour) % 24, minutes: Number(p.minute), weekday: p.weekday, day: Number(p.day), month: Number(p.month) - 1 };
+    ptAt = now;
+    return ptCache;
+  }
+
   let g = null; // current 2d context
   function R(x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
   function box(x, y, w, h, fill, line = OUT) { R(x, y, w, h, line); R(x + 1, y + 1, w - 2, h - 2, fill); }
@@ -433,8 +448,8 @@
 
   /* ---------- scenery ---------- */
 
-  function skyAt(date) {
-    const h = date.getHours() + date.getMinutes() / 60;
+  function skyAt(pt) {
+    const h = pt.hours + pt.minutes / 60;
     const P = { night: ['#0f1638', '#2a3570'], dawn: ['#f09a9a', '#fcd7a4'], day: ['#5fb4ee', '#bfe6f7'], dusk: ['#6d5bb0', '#f59f6a'] };
     const blend = (A, B, t) => ({ top: mix(A[0], B[0], t), bot: mix(A[1], B[1], t) });
     let s, dark;
@@ -491,11 +506,11 @@
     box(x - 2, y + h + 4, w + 4, 6, '#9a5627'); R(x - 1, y + h + 5, w + 2, 1, '#c98646');
   }
 
-  function drawClock(cx, cy, date) {
+  function drawClock(cx, cy, pt) {
     R(cx - 3, cy - 5, 7, 11, OUT); R(cx - 5, cy - 3, 11, 7, OUT); R(cx - 4, cy - 4, 9, 9, OUT);
     R(cx - 2, cy - 4, 5, 9, '#fbf3dc'); R(cx - 4, cy - 2, 9, 5, '#fbf3dc'); R(cx - 3, cy - 3, 7, 7, '#fbf3dc');
     R(cx, cy - 4, 1, 1, '#b8612a'); R(cx, cy + 4, 1, 1, '#b8612a'); R(cx - 4, cy, 1, 1, '#b8612a'); R(cx + 4, cy, 1, 1, '#b8612a');
-    const m = date.getMinutes(), hr = (date.getHours() % 12) + m / 60;
+    const m = pt.minutes, hr = (pt.hours % 12) + m / 60;
     const ma = (m / 60) * Math.PI * 2, ha = (hr / 12) * Math.PI * 2;
     line(cx, cy, cx + Math.round(Math.sin(ma) * 3.4), cy - Math.round(Math.cos(ma) * 3.4), OUT);
     line(cx, cy, cx + Math.round(Math.sin(ha) * 2.2), cy - Math.round(Math.cos(ha) * 2.2), '#c0392b');
@@ -674,16 +689,21 @@
   function updateDog(dt, t) {
     const d = S.dog;
     d.happy = t < d.happyUntil;
+    if (d.chase) {
+      const m = d.chase;
+      if (m.hidden || t > d.chaseUntil) { d.chase = null; d.target = null; d.until = t + rnd(2, 4); }
+      else d.target = { x: clamp(m.x, 8, W - 8), y: clamp(m.y + 1, WALL_H + 8, S.H - 4) };
+    }
     if (d.follow) {
       const a = S.agents.get(d.follow);
       if (!a || a.seated || a.pose || t > d.followUntil) { d.follow = null; d.target = null; d.until = t + rnd(2, 5); }
       else d.target = { x: clamp(a.x + (a.x > d.x ? -10 : 10), 8, W - 8), y: a.y + 1 };
     }
     if (d.target) {
-      const dx = d.target.x - d.x, dy = d.target.y - d.y, dist = Math.hypot(dx, dy), step = (d.follow ? 24 : 16) * dt;
+      const dx = d.target.x - d.x, dy = d.target.y - d.y, dist = Math.hypot(dx, dy), step = (d.chase ? 30 : d.follow ? 24 : 16) * dt;
       if (dist <= Math.max(step, 0.5)) {
         d.x = d.target.x; d.y = d.target.y; d.moving = false;
-        if (d.follow) { d.happyUntil = t + 0.4; return; }
+        if (d.follow || d.chase) { d.happyUntil = t + 0.4; return; }
         d.target = null;
         d.until = t + rnd(3, 9);
         d.sleep = Math.random() < (S.dark > 0.5 ? 0.55 : 0.2);
@@ -699,6 +719,8 @@
     if (d.sleep && t > d.nextZ) { d.nextZ = t + 1.6; spawn({ kind: 'z', x: d.x + 2, y: d.y - 10, vx: 2, vy: -5, life: 1.8, color: '#6b7fd8' }); }
     if (t > d.until) {
       d.sleep = false;
+      const prey = S.mice.find((m) => !m.hidden && Math.hypot(m.x - d.x, m.y - d.y) < 70);
+      if (prey && Math.random() < 0.5) { d.chase = prey; d.chaseUntil = t + 3; d.bubbleIcon = 'bang'; d.bubbleUntil = t + 1.2; return; }
       const walkers = [...S.agents.values()].filter((a) => !a.seated && !a.pose);
       const r = Math.random();
       if (r < 0.35 && walkers.length) { d.follow = pick(walkers).id; d.followUntil = t + rnd(6, 14); }
@@ -711,14 +733,259 @@
     for (let i = 0; i < 3; i++) spawn({ kind: 'heart', x: d.x + rnd(-4, 4), y: d.y - 12, vx: rnd(-4, 4), vy: rnd(-14, -8), life: 1.3, color: '#e0415a' });
     d.sleep = false;
     d.happyUntil = S.now + 2.5;
+    d.bubbleIcon = 'heart';
     d.bubbleUntil = S.now + 2;
     d.until = Math.max(d.until, S.now + 2.5);
+  }
+
+  /* ---------- the mice (white and black) ---------- */
+
+  const MOUSE_HOLES = [112, 216];
+  const near = (a, b, r) => !!a && !a.hidden && Math.hypot(a.x - b.x, a.y - b.y) < r;
+
+  function paintMouse(m, x, y, t) {
+    const fx = (px, w) => (m.dir > 0 ? x + px : x - px - w);
+    const step = m.moving ? Math.floor(t * 16) % 2 : 0;
+    const parts = [[-2, -3, 4, 2, m.fur], [1, -4, 2, 2, m.fur]];
+    for (const [px, py, w, h] of parts) R(fx(px, w) - 1, y + py - 1, w + 2, h + 2, OUT);
+    for (const [px, py, w, h, c] of parts) R(fx(px, w), y + py, w, h, c);
+    R(fx(-2, 4), y - 2, 4, 1, m.belly);
+    R(fx(1, 1), y - 5, 1, 1, m.ear);
+    R(fx(2, 1), y - 4, 1, 1, m.eye);
+    R(fx(3, 1), y - 3, 1, 1, '#f08a9a');
+    R(fx(-5, 3), y - 2 - step, 3, 1, m.tail);
+    R(fx(-1 + step, 1), y - 1, 1, 1, m.tail); R(fx(1 - step, 1), y - 1, 1, 1, m.tail);
+  }
+
+  function mouseSpot() {
+    return Math.random() < 0.5
+      ? { x: rnd(20, 236), y: WALL_H + rnd(2, 6) } // scurrying along the wall
+      : { x: rnd(20, 236), y: rnd(WALL_H + 10, S.H - 6) };
+  }
+
+  function spookMouse(m) {
+    if (m.hidden || m.fleeing) return;
+    const hide = S.hides.reduce((best, h) => (Math.hypot(h.x - m.x, h.y - m.y) < Math.hypot(best.x - m.x, best.y - m.y) ? h : best), S.hides[0]);
+    m.path = [{ x: hide.x, y: hide.y, hide }];
+    m.speed = 72;
+    m.pauseUntil = 0;
+    m.fleeing = true;
+    spawn({ kind: 'spark', x: m.x, y: m.y - 7, vx: 0, vy: -10, life: 0.5, color: '#ffffff' });
+  }
+
+  // Mice stay hidden most of the time, then peek out, dash around with sniffing stops,
+  // and duck into a different hiding spot.
+  function updateMouse(m, dt, t) {
+    if (m.hidden) {
+      if (t < m.until) return;
+      m.hidden = false;
+      m.fleeing = false;
+      m.speed = 44;
+      m.x = m.hide.x; m.y = m.hide.y;
+      m.path = [];
+      for (let i = 0, n = 1 + Math.floor(Math.random() * 3); i < n; i++) m.path.push(mouseSpot());
+      const next = pick(S.hides.filter((h) => h !== m.hide));
+      m.path.push({ x: next.x, y: next.y, hide: next });
+      m.pauseUntil = t + rnd(0.3, 1); // peek first
+      return;
+    }
+    if (!m.fleeing && (near(S.dog, m, 16) || near(S.ferret, m, 14))) spookMouse(m);
+    if (t < m.pauseUntil) { m.moving = false; return; }
+    const p = m.path[0];
+    if (!p) { m.hidden = true; m.until = t + rnd(10, 30); return; }
+    const dx = p.x - m.x, dy = p.y - m.y, dist = Math.hypot(dx, dy), step = m.speed * dt;
+    m.moving = true;
+    if (Math.abs(dx) > 0.3) m.dir = Math.sign(dx);
+    if (dist <= step) {
+      m.x = p.x; m.y = p.y;
+      m.path.shift();
+      if (p.hide) { m.hide = p.hide; m.hidden = true; m.moving = false; m.path = []; m.until = t + rnd(12, 35); }
+      else m.pauseUntil = t + rnd(0.4, 1.8); // stop and sniff
+    } else {
+      m.x += (dx / dist) * step;
+      m.y += (dy / dist) * step;
+    }
+  }
+
+  /* ---------- the ferret: mischievous, bouncy and very loving ---------- */
+
+  const SOCKS = ['#e0415a', '#3a8fe0', '#f2c14e', '#7a4fd0', '#5ba044', '#ffffff'];
+
+  function paintFerret(f, x, y, t) {
+    const dancing = t < f.danceUntil;
+    y -= dancing ? (Math.floor(t * 8) % 2) * 2 : f.moving ? Math.floor(t * 8) % 2 : 0; // bouncy gait
+    const fx = (px, w) => (f.dir > 0 ? x + px : x - px - w);
+    const FUR = '#8a6448', DARK = '#4f3526', CREAM = '#f0e2c6';
+    const step = f.moving ? Math.floor(t * 10) % 2 : 0;
+    let parts, marks;
+    if (f.sleep) {
+      parts = [[-3, -4, 6, 3, FUR], [2, -4, 2, 2, CREAM], [-5, -2, 4, 1, DARK]];
+      marks = [[2, -4, 1, 1, DARK], [-2, -4, 4, 1, shade(FUR, 1.15)]];
+    } else {
+      parts = [
+        [-4, -5, 7, 3, FUR],
+        [3, -6, 3, 3, CREAM],
+        [-6, -5, 2, 2, DARK],
+        [-3, -2, 1, step ? 1 : 2, DARK], [-1, -2, 1, step ? 2 : 1, DARK], [1, -2, 1, step ? 1 : 2, DARK], [2, -2, 1, step ? 2 : 1, DARK],
+      ];
+      marks = [[3, -7, 1, 1, CREAM], [4, -5, 2, 1, DARK], [4, -5, 1, 1, '#1a1a1a'], [6, -5, 1, 1, '#f08a9a'], [-3, -5, 5, 1, shade(FUR, 1.15)]];
+      if (f.carry) marks.push([6, -4, 2, 2, f.carry]);
+    }
+    for (const [px, py, w, h] of parts) R(fx(px, w) - 1, y + py - 1, w + 2, h + 2, OUT);
+    for (const [px, py, w, h, col] of parts) R(fx(px, w), y + py, w, h, col);
+    for (const [px, py, w, h, col] of marks) R(fx(px, w), y + py, w, h, col);
+  }
+
+  function ferretSay(icon, dur) {
+    S.ferret.bubbleIcon = icon;
+    S.ferret.bubbleUntil = S.now + dur;
+  }
+
+  function chooseFerretTask(t) {
+    const f = S.ferret;
+    f.sleep = false;
+    f.buddy = null;
+    const r = Math.random();
+    const prey = S.mice.find((m) => !m.hidden && Math.hypot(m.x - f.x, m.y - f.y) < 60);
+    if (prey && r < 0.4) { f.chase = prey; f.chaseUntil = t + 2.5; f.task = 'chase'; ferretSay('note', 1); return; }
+    if (r < 0.18) { f.task = 'dance'; f.danceUntil = t + 2.4; f.until = t + 2.6; ferretSay('note', 2); return; }
+    if (r < 0.36) {
+      const d = pick(S.desks);
+      f.task = 'steal';
+      f.target = { x: d.cx + 10, y: d.ty + 18 };
+      return;
+    }
+    if (r < 0.56) {
+      const friends = [...S.agents.values()].filter((a) => !a.seated && !a.pose && !a.moving);
+      const buddy = friends.length && Math.random() < 0.6 ? pick(friends) : S.dog;
+      f.task = 'cuddle';
+      f.buddy = buddy;
+      f.target = { x: clamp(buddy.x + (buddy.x > f.x ? -8 : 8), 8, W - 8), y: clamp(buddy.y + 1, WALL_H + 8, S.H - 4) };
+      return;
+    }
+    if (r < 0.66) { f.task = 'bin'; f.target = { x: S.bin.x + 10, y: S.bin.base + 3 }; return; }
+    if (r < 0.8 || S.dark > 0.5) { f.task = 'nap'; f.target = { x: rnd(84, 148), y: rnd(S.LT + 16, S.LT + 48) }; return; }
+    f.task = 'wander';
+    f.target = { x: rnd(20, 236), y: rnd(WALL_H + 10, S.H - 6) };
+  }
+
+  function arriveFerret(t) {
+    const f = S.ferret;
+    switch (f.task) {
+      case 'steal': // grab a sock off the desk and run it back to the stash
+        f.carry = pick(SOCKS);
+        ferretSay('bang', 1.2);
+        f.task = 'stash';
+        f.target = { x: S.stash.x + 6, y: S.stash.y };
+        return;
+      case 'stash':
+        S.stashItems.push(f.carry);
+        if (S.stashItems.length > 8) S.stashItems.shift();
+        f.carry = null;
+        f.task = 'dance';
+        f.danceUntil = t + 1.6;
+        f.until = t + 1.8;
+        ferretSay('note', 1.6);
+        return;
+      case 'cuddle':
+        f.happyUntil = t + 3;
+        f.until = t + rnd(3, 5);
+        f.dir = f.buddy && f.buddy.x > f.x ? 1 : -1;
+        ferretSay('heart', 2.5);
+        for (let i = 0; i < 3; i++) spawn({ kind: 'heart', x: f.x + rnd(-3, 3), y: f.y - 8, vx: rnd(-4, 4), vy: rnd(-12, -7), life: 1.2, color: '#e0415a' });
+        if (f.buddy === S.dog) {
+          S.dog.happyUntil = t + 3;
+          if (S.dog.sleep) { f.sleep = true; f.until = t + rnd(8, 16); } // curls up with the sleeping dog
+        } else if (f.buddy && f.buddy.id) emote(f.buddy, 'heart');
+        return;
+      case 'bin': // hop into the shipping bin; pops back out a bit later
+        f.hidden = true;
+        S.binOpenUntil = t + 0.8;
+        f.until = t + rnd(4, 9);
+        return;
+      case 'nap':
+        f.sleep = true;
+        f.until = t + rnd(8, 20);
+        return;
+      default:
+        f.until = t + rnd(1, 4);
+    }
+  }
+
+  function updateFerret(dt, t) {
+    const f = S.ferret;
+    if (f.hidden) {
+      if (t > f.until) {
+        f.hidden = false;
+        S.binOpenUntil = t + 0.8;
+        f.x = S.bin.x + 10; f.y = S.bin.base + 3;
+        for (let i = 0; i < 8; i++) spawn({ kind: 'spark', x: f.x + rnd(-6, 6), y: f.y - 14 + rnd(-3, 3), vx: rnd(-10, 10), vy: rnd(-20, -6), life: 0.8, color: pick(['#fff3a0', '#ffffff']) });
+        ferretSay('bang', 1.4);
+        f.task = 'idle';
+        f.until = t + rnd(1, 3);
+      }
+      return;
+    }
+    if (f.chase) {
+      const m = f.chase;
+      if (m.hidden || t > f.chaseUntil) { f.chase = null; f.target = null; f.task = 'idle'; f.until = t + rnd(1, 3); ferretSay('q', 1.2); }
+      else f.target = { x: clamp(m.x, 8, W - 8), y: clamp(m.y + 1, WALL_H + 8, S.H - 4) };
+    }
+    if (f.target) {
+      const dx = f.target.x - f.x, dy = f.target.y - f.y, dist = Math.hypot(dx, dy);
+      const step = (f.chase ? 34 : f.carry ? 30 : 20) * dt;
+      if (Math.abs(dx) > 0.3) f.dir = Math.sign(dx);
+      if (dist <= Math.max(step, 0.5)) {
+        f.x = f.target.x; f.y = f.target.y; f.moving = false;
+        if (f.chase) return;
+        f.target = null;
+        arriveFerret(t);
+        return;
+      }
+      f.moving = true;
+      f.x += (dx / dist) * step;
+      f.y += (dy / dist) * step;
+      return;
+    }
+    f.moving = false;
+    if (f.sleep && t > f.nextZ) { f.nextZ = t + 1.8; spawn({ kind: 'z', x: f.x + 2, y: f.y - 8, vx: 2, vy: -5, life: 1.6, color: '#8a7fd8' }); }
+    if (t < f.danceUntil) {
+      // the weasel war dance: hop and spin
+      const flip = Math.floor(t * 4);
+      if (flip !== f.lastFlip) { f.lastFlip = flip; f.dir = -f.dir; }
+      return;
+    }
+    if (t > f.until) chooseFerretTask(t);
+  }
+
+  function petFerret() {
+    const f = S.ferret;
+    if (f.hidden) return;
+    for (let i = 0; i < 4; i++) spawn({ kind: 'heart', x: f.x + rnd(-4, 4), y: f.y - 8, vx: rnd(-5, 5), vy: rnd(-14, -8), life: 1.3, color: '#e0415a' });
+    f.sleep = false;
+    f.target = null;
+    f.chase = null;
+    f.task = 'dance';
+    f.danceUntil = S.now + 2;
+    f.until = S.now + 2.4;
+    ferretSay('heart', 2);
+  }
+
+  function drawStash() {
+    const { x, y } = S.stash;
+    S.stashItems.forEach((c, i) => {
+      const sx = x + (i % 4) * 3, sy = y - 3 - Math.floor(i / 4) * 2;
+      R(sx - 1, sy - 1, 4, 4, OUT);
+      R(sx, sy, 2, 2, c);
+      R(sx + 2, sy + 1, 1, 1, c); // the sock's toe
+    });
   }
 
   /* ---------- layout & movement ---------- */
 
   const S = {
     agents: new Map(), desks: [], pois: [], corridors: [], particles: [], notes: [], decor: normalizeDecor(null),
+    mice: [], stashItems: [], hides: [],
     H: 200, LT: 150, scale: 1, now: 0, last: 0, binOpenUntil: 0, dark: 0, coffeeBusy: false,
   };
 
@@ -740,6 +1007,15 @@
     S.seats = [{ x: S.couch.x + 12 }, { x: S.couch.x + 34 }];
     S.bin = { x: 164, base: LT + 30, stand: { x: 174, y: LT + 40 } };
     S.counter = { x: 206, base: LT + 30 };
+    // Where the mice hide: two holes in the baseboard, and under or behind the lounge furniture.
+    S.hides = [
+      { x: MOUSE_HOLES[0], y: WALL_H + 1 },
+      { x: MOUSE_HOLES[1], y: WALL_H + 1 },
+      { x: 34, y: S.couch.y + 21 },
+      { x: 226, y: S.counter.base - 2 },
+      { x: 174, y: S.bin.base - 2 },
+    ];
+    S.stash = { x: 4, y: LT + 46 };
     S.pois = [
       { id: 'coffee', x: 222, y: LT + 40, emote: 'coffee' },
       { id: 'books', x: 146, y: WALL_H + 8, emote: 'book' },
@@ -772,6 +1048,10 @@
     R(0, 38, W, 16, th.wain);
     for (let x = 0; x < W; x += 16) { R(x, 38, 1, 16, shade(th.wain, 0.87)); R(x + 1, 38, 1, 16, shade(th.wain, 1.17)); }
     R(0, 54, W, 4, shade(th.wain, 0.6));
+    for (const hx of MOUSE_HOLES) {
+      R(hx - 2, 54, 5, 4, '#1a0f08');
+      R(hx - 2, 54, 1, 1, shade(th.wain, 0.6)); R(hx + 2, 54, 1, 1, shade(th.wain, 0.6));
+    }
     paintFloor(0, WALL_H, W, S.H - WALL_H, FLOORS[S.decor.floor]);
     paintRug(76, S.LT + 8, 80, 44, RUGS[S.decor.rug]);
     g = prev;
@@ -987,7 +1267,9 @@
         a.x = clamp(a.x, 8, W - 8); a.y = clamp(a.y, WALL_H + 8, S.H - 4);
         a.replan = true;
       }
-      if (S.dog) { S.dog.y = clamp(S.dog.y, WALL_H + 10, S.H - 4); S.dog.target = null; S.dog.follow = null; }
+      if (S.dog) { S.dog.y = clamp(S.dog.y, WALL_H + 10, S.H - 4); S.dog.target = null; S.dog.follow = null; S.dog.chase = null; }
+      if (S.ferret) { S.ferret.y = clamp(S.ferret.y, WALL_H + 10, S.H - 4); S.ferret.target = null; S.ferret.chase = null; S.ferret.carry = null; }
+      S.mice.forEach((m, i) => { m.hide = S.hides[i]; m.hidden = true; m.path = []; m.until = S.now + rnd(3, 10); });
     }
     S.notes = list.filter((x) => x.id !== 'hermes').map((x) => ({
       color: x.working ? '#b5ec8a' : x.paused ? '#d9d2c0' : x.error ? '#f4a09a' : '#fbe9a0',
@@ -1090,6 +1372,10 @@
     if (best) return best.id;
     const d = S.dog;
     if (Math.abs(wx - d.x) < 11 && wy > d.y - 14 && wy < d.y + 3) return 'dog';
+    const f = S.ferret;
+    if (!f.hidden && Math.abs(wx - f.x) < 9 && wy > f.y - 10 && wy < f.y + 3) return 'ferret';
+    const m = S.mice.find((mm) => !mm.hidden && Math.abs(wx - mm.x) < 8 && Math.abs(wy - (mm.y - 2)) < 6);
+    if (m) return m.id;
     for (const desk of S.desks) {
       if (desk.agent && wx >= desk.cx - 16 && wx <= desk.cx + 16 && wy >= desk.ty - 12 && wy <= desk.ty + 17) return desk.agent.id;
     }
@@ -1101,7 +1387,9 @@
     const wx = ((e.clientX - rect.left) * W) / rect.width;
     const wy = ((e.clientY - rect.top) * S.H) / rect.height;
     const id = hit(wx, wy);
+    if (id && id.startsWith('mouse')) { spookMouse(S.mice.find((m) => m.id === id)); return; } // shy: they just run
     if (id === 'dog') petDog();
+    if (id === 'ferret') petFerret();
     if (id && S.onTap) S.onTap(id);
   }
 
@@ -1111,12 +1399,14 @@
     S.last = ts;
     S.now += dt;
     const t = S.now;
-    const date = new Date();
-    const sky = skyAt(date);
+    const pt = pacificTime();
+    const sky = skyAt(pt);
     S.dark = sky.dark;
 
     for (const a of S.agents.values()) updateAgent(a, dt);
     updateDog(dt, t);
+    updateFerret(dt, t);
+    for (const m of S.mice) updateMouse(m, dt, t);
 
     const coffeePoi = S.pois.find((p) => p.id === 'coffee');
     S.coffeeBusy = !!(coffeePoi && coffeePoi.occ && S.agents.get(coffeePoi.occ) && !S.agents.get(coffeePoi.occ).moving);
@@ -1129,7 +1419,7 @@
     g.drawImage(S.bg, 0, 0);
     drawWindow(18, 8, 40, 24, sky, t, 1);
     drawWindow(168, 8, 40, 24, sky, t, 5);
-    drawClock(72, 18, date);
+    drawClock(72, 18, pt);
     drawBoard(84, 8);
 
     const arcadePoi = S.pois.find((p) => p.arcade);
@@ -1143,7 +1433,12 @@
       { y: S.counter.base, draw: drawCounter },
       { y: S.LT + 34, draw: () => drawMarigoldPot(64, S.LT + 34) },
       { y: S.dog.y, draw: () => paintDog(S.dog, Math.round(S.dog.x), Math.round(S.dog.y), t) },
+      { y: S.stash.y - 1, draw: drawStash },
     ];
+    if (!S.ferret.hidden) drawables.push({ y: S.ferret.y, draw: () => paintFerret(S.ferret, Math.round(S.ferret.x), Math.round(S.ferret.y), t) });
+    for (const m of S.mice) {
+      if (!m.hidden) drawables.push({ y: m.y, draw: () => paintMouse(m, Math.round(m.x), Math.round(m.y), t) });
+    }
     for (const d of S.desks) drawables.push({ y: d.ty + DESK_H, draw: () => drawDeskUnit(d, t) });
     for (const a of S.agents.values()) {
       if (a.seated || a.pose) continue;
@@ -1160,7 +1455,8 @@
     for (const a of S.agents.values()) {
       if (a.emote && t < a.emote.until) bubble(headX(a), topOf(a), a.emote.icon);
     }
-    if (t < S.dog.bubbleUntil) bubble(S.dog.x + S.dog.dir * 4, S.dog.y - 10, 'heart');
+    if (t < S.dog.bubbleUntil) bubble(S.dog.x + S.dog.dir * 4, S.dog.y - 10, S.dog.bubbleIcon || 'heart');
+    if (!S.ferret.hidden && t < S.ferret.bubbleUntil) bubble(S.ferret.x + S.ferret.dir * 3, S.ferret.y - 6, S.ferret.bubbleIcon);
     drawParticles(dt);
     lighting(sky, playing);
     for (const a of S.agents.values()) updateTag(a);
@@ -1198,7 +1494,15 @@
     S.onTap = opts.onTap;
     S.books = makeBooks();
     layout(0);
-    S.dog = { x: 112, y: S.LT + 32, dir: 1, target: null, until: 3, sleep: false, nextZ: 0, moving: false, happy: false, happyUntil: 0, bubbleUntil: 0, follow: null, followUntil: 0 };
+    S.dog = { x: 112, y: S.LT + 32, dir: 1, target: null, until: 3, sleep: false, nextZ: 0, moving: false, happy: false, happyUntil: 0, bubbleUntil: 0, bubbleIcon: 'heart', follow: null, followUntil: 0, chase: null, chaseUntil: 0 };
+    S.ferret = { x: 140, y: S.LT + 46, dir: -1, target: null, task: 'idle', until: 2, moving: false, hidden: false, sleep: false, carry: null, danceUntil: 0, happyUntil: 0, bubbleUntil: 0, bubbleIcon: 'heart', nextZ: 0, buddy: null, chase: null, chaseUntil: 0, lastFlip: 0 };
+    S.mice = [
+      { id: 'mouse-white', fur: '#f4f2ec', belly: '#d8d4ca', ear: '#f3a0b0', eye: '#c0304a', tail: '#eba5ae' },
+      { id: 'mouse-black', fur: '#2e2e34', belly: '#1c1c20', ear: '#9a7078', eye: '#e8e8e8', tail: '#8a6a70' },
+    ].map((m, i) => Object.assign(m, {
+      hide: S.hides[i], x: S.hides[i].x, y: S.hides[i].y, dir: 1, hidden: true, until: rnd(3, 8) + i * 5,
+      path: [], pauseUntil: 0, speed: 44, moving: false, fleeing: false,
+    }));
     new ResizeObserver(resize).observe(S.wrap);
     S.stage.addEventListener('click', onClick);
     document.addEventListener('visibilitychange', () => {
@@ -1217,6 +1521,14 @@
       g.imageSmoothingEnabled = false;
       g.clearRect(0, 0, 18, 14);
       paintDog({ dir: 1, sleep: false, moving: false, happy: true }, 8, 13, 0);
+      g = prev;
+      return;
+    }
+    if (id === 'ferret') {
+      canvas.width = 16; canvas.height = 10;
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, 16, 10);
+      paintFerret({ dir: 1, sleep: false, moving: false, danceUntil: 0, carry: null }, 8, 9, 0);
       g = prev;
       return;
     }
@@ -1239,6 +1551,7 @@
     const hermes = { look: lookFor('hermes'), sleeping: false, blinkOffset: 0.5 };
     hermes.sprites = buildSprites(hermes.look);
     const pup = { dir: -1, sleep: false, moving: false, happy: true };
+    const kit = { dir: 1, sleep: false, moving: false, danceUntil: 0, carry: null };
     const clouds = Array.from({ length: 5 }, (_, i) => ({ x: i * 44 + rnd(0, 20), y: rnd(8, 46), s: rnd(2, 5), big: Math.random() < 0.5 }));
     const birds = [];
     let raf = 0;
@@ -1300,6 +1613,8 @@
       face(hermes, hx, hy, t);
       if (Math.floor(t * 3) % 2) R(hx - 1, hy + 9, 1, 2, hermes.look.skin); // wave
       paintDog(pup, hx + 24, h - 20, t);
+      kit.danceUntil = t % 6 < 1.5 ? t + 1 : 0;
+      paintFerret(kit, hx - 12, h - 19, t);
     }
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
@@ -1317,6 +1632,9 @@
     floatText,
     levelUp,
     petDog,
+    petFerret,
+    pacificTime,
+    critterInfo: () => ({ socks: S.stashItems.length }),
     defaultLook: (id) => baseLook(id),
     defaultDecor: () => Object.assign({}, DEFAULT_DECOR),
     palette: {

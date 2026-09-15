@@ -151,7 +151,7 @@ const DECOR = {
   couch: new Set(['red', 'green', 'blue', 'purple', 'mustard']),
   rug: new Set(['red', 'blue', 'green', 'purple']),
 };
-const AGENT_ID = /^(hermes|dog|job:[A-Za-z0-9_][A-Za-z0-9_.-]{0,63})$/;
+const AGENT_ID = /^(hermes|dog|ferret|job:[A-Za-z0-9_][A-Za-z0-9_.-]{0,63})$/;
 const FAILED = new Set(['error', 'failed', 'failure']);
 
 function levelOf(xp) {
