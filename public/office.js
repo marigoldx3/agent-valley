@@ -691,12 +691,12 @@
     d.happy = t < d.happyUntil;
     if (d.chase) {
       const m = d.chase;
-      if (m.hidden || t > d.chaseUntil) { d.chase = null; d.target = null; d.until = t + rnd(2, 4); }
+      if (m.hidden || t > d.chaseUntil) { d.chase = null; d.target = null; d.until = t + rnd(6, 12); }
       else d.target = { x: clamp(m.x, 8, W - 8), y: clamp(m.y + 1, WALL_H + 8, S.H - 4) };
     }
     if (d.follow) {
       const a = S.agents.get(d.follow);
-      if (!a || a.seated || a.pose || t > d.followUntil) { d.follow = null; d.target = null; d.until = t + rnd(2, 5); }
+      if (!a || a.seated || a.pose || t > d.followUntil) { d.follow = null; d.target = null; d.until = t + rnd(6, 12); }
       else d.target = { x: clamp(a.x + (a.x > d.x ? -10 : 10), 8, W - 8), y: a.y + 1 };
     }
     if (d.target) {
@@ -705,8 +705,8 @@
         d.x = d.target.x; d.y = d.target.y; d.moving = false;
         if (d.follow || d.chase) { d.happyUntil = t + 0.4; return; }
         d.target = null;
-        d.until = t + rnd(3, 9);
-        d.sleep = Math.random() < (S.dark > 0.5 ? 0.55 : 0.2);
+        d.until = t + rnd(10, 22);
+        d.sleep = Math.random() < (S.dark > 0.5 ? 0.7 : 0.35);
         return;
       }
       d.moving = true;
@@ -720,10 +720,10 @@
     if (t > d.until) {
       d.sleep = false;
       const prey = S.mice.find((m) => !m.hidden && Math.hypot(m.x - d.x, m.y - d.y) < 70);
-      if (prey && Math.random() < 0.5) { d.chase = prey; d.chaseUntil = t + 3; d.bubbleIcon = 'bang'; d.bubbleUntil = t + 1.2; return; }
+      if (prey && Math.random() < 0.25) { d.chase = prey; d.chaseUntil = t + 3; d.bubbleIcon = 'bang'; d.bubbleUntil = t + 1.2; return; }
       const walkers = [...S.agents.values()].filter((a) => !a.seated && !a.pose);
       const r = Math.random();
-      if (r < 0.35 && walkers.length) { d.follow = pick(walkers).id; d.followUntil = t + rnd(6, 14); }
+      if (r < 0.25 && walkers.length) { d.follow = pick(walkers).id; d.followUntil = t + rnd(5, 10); }
       else d.target = r < 0.75 ? { x: rnd(80, 150), y: rnd(S.LT + 16, S.LT + 50) } : { x: rnd(20, 236), y: pick(S.corridors) + 2 };
     }
   }
@@ -740,7 +740,7 @@
 
   /* ---------- the mice (white and black) ---------- */
 
-  const MOUSE_HOLES = [112, 216];
+  const MOUSE_HOLES = [216]; // one hole in the baseboard, by the arcade
   const near = (a, b, r) => !!a && !a.hidden && Math.hypot(a.x - b.x, a.y - b.y) < r;
 
   function paintMouse(m, x, y, t) {
@@ -783,7 +783,7 @@
       m.speed = 44;
       m.x = m.hide.x; m.y = m.hide.y;
       m.path = [];
-      for (let i = 0, n = 1 + Math.floor(Math.random() * 3); i < n; i++) m.path.push(mouseSpot());
+      for (let i = 0, n = 1 + Math.floor(Math.random() * 2); i < n; i++) m.path.push(mouseSpot());
       const next = pick(S.hides.filter((h) => h !== m.hide));
       m.path.push({ x: next.x, y: next.y, hide: next });
       m.pauseUntil = t + rnd(0.3, 1); // peek first
@@ -792,14 +792,14 @@
     if (!m.fleeing && (near(S.dog, m, 16) || near(S.ferret, m, 14))) spookMouse(m);
     if (t < m.pauseUntil) { m.moving = false; return; }
     const p = m.path[0];
-    if (!p) { m.hidden = true; m.until = t + rnd(10, 30); return; }
+    if (!p) { m.hidden = true; m.until = t + rnd(40, 90); return; }
     const dx = p.x - m.x, dy = p.y - m.y, dist = Math.hypot(dx, dy), step = m.speed * dt;
     m.moving = true;
     if (Math.abs(dx) > 0.3) m.dir = Math.sign(dx);
     if (dist <= step) {
       m.x = p.x; m.y = p.y;
       m.path.shift();
-      if (p.hide) { m.hide = p.hide; m.hidden = true; m.moving = false; m.path = []; m.until = t + rnd(12, 35); }
+      if (p.hide) { m.hide = p.hide; m.hidden = true; m.moving = false; m.path = []; m.until = t + rnd(40, 90); }
       else m.pauseUntil = t + rnd(0.4, 1.8); // stop and sniff
     } else {
       m.x += (dx / dist) * step;
@@ -847,7 +847,7 @@
     f.buddy = null;
     const r = Math.random();
     const prey = S.mice.find((m) => !m.hidden && Math.hypot(m.x - f.x, m.y - f.y) < 60);
-    if (prey && r < 0.4) { f.chase = prey; f.chaseUntil = t + 2.5; f.task = 'chase'; ferretSay('note', 1); return; }
+    if (prey && r < 0.2) { f.chase = prey; f.chaseUntil = t + 2.5; f.task = 'chase'; ferretSay('note', 1); return; }
     if (r < 0.18) { f.task = 'dance'; f.danceUntil = t + 2.4; f.until = t + 2.6; ferretSay('note', 2); return; }
     if (r < 0.36) {
       const d = pick(S.desks);
@@ -889,7 +889,7 @@
         return;
       case 'cuddle':
         f.happyUntil = t + 3;
-        f.until = t + rnd(3, 5);
+        f.until = t + rnd(6, 10);
         f.dir = f.buddy && f.buddy.x > f.x ? 1 : -1;
         ferretSay('heart', 2.5);
         for (let i = 0; i < 3; i++) spawn({ kind: 'heart', x: f.x + rnd(-3, 3), y: f.y - 8, vx: rnd(-4, 4), vy: rnd(-12, -7), life: 1.2, color: '#e0415a' });
@@ -901,14 +901,14 @@
       case 'bin': // hop into the shipping bin; pops back out a bit later
         f.hidden = true;
         S.binOpenUntil = t + 0.8;
-        f.until = t + rnd(4, 9);
+        f.until = t + rnd(8, 16);
         return;
       case 'nap':
         f.sleep = true;
-        f.until = t + rnd(8, 20);
+        f.until = t + rnd(15, 35);
         return;
       default:
-        f.until = t + rnd(1, 4);
+        f.until = t + rnd(6, 14);
     }
   }
 
@@ -922,13 +922,13 @@
         for (let i = 0; i < 8; i++) spawn({ kind: 'spark', x: f.x + rnd(-6, 6), y: f.y - 14 + rnd(-3, 3), vx: rnd(-10, 10), vy: rnd(-20, -6), life: 0.8, color: pick(['#fff3a0', '#ffffff']) });
         ferretSay('bang', 1.4);
         f.task = 'idle';
-        f.until = t + rnd(1, 3);
+        f.until = t + rnd(5, 10);
       }
       return;
     }
     if (f.chase) {
       const m = f.chase;
-      if (m.hidden || t > f.chaseUntil) { f.chase = null; f.target = null; f.task = 'idle'; f.until = t + rnd(1, 3); ferretSay('q', 1.2); }
+      if (m.hidden || t > f.chaseUntil) { f.chase = null; f.target = null; f.task = 'idle'; f.until = t + rnd(5, 10); ferretSay('q', 1.2); }
       else f.target = { x: clamp(m.x, 8, W - 8), y: clamp(m.y + 1, WALL_H + 8, S.H - 4) };
     }
     if (f.target) {
@@ -1007,15 +1007,15 @@
     S.seats = [{ x: S.couch.x + 12 }, { x: S.couch.x + 34 }];
     S.bin = { x: 164, base: LT + 30, stand: { x: 174, y: LT + 40 } };
     S.counter = { x: 206, base: LT + 30 };
-    // Where the mice hide: two holes in the baseboard, and under or behind the lounge furniture.
+    // Where the mice hide: the baseboard hole, and under or behind the lounge furniture.
     S.hides = [
-      { x: MOUSE_HOLES[0], y: WALL_H + 1 },
-      { x: MOUSE_HOLES[1], y: WALL_H + 1 },
+      ...MOUSE_HOLES.map((x) => ({ x, y: WALL_H + 1 })),
       { x: 34, y: S.couch.y + 21 },
       { x: 226, y: S.counter.base - 2 },
       { x: 174, y: S.bin.base - 2 },
     ];
-    S.stash = { x: 4, y: LT + 46 };
+    // The ferret's sock stash sits under the couch; only the bottom row peeks out between the legs.
+    S.stash = { x: 26, y: S.couch.y + 26 };
     S.pois = [
       { id: 'coffee', x: 222, y: LT + 40, emote: 'coffee' },
       { id: 'books', x: 146, y: WALL_H + 8, emote: 'book' },
@@ -1269,7 +1269,7 @@
       }
       if (S.dog) { S.dog.y = clamp(S.dog.y, WALL_H + 10, S.H - 4); S.dog.target = null; S.dog.follow = null; S.dog.chase = null; }
       if (S.ferret) { S.ferret.y = clamp(S.ferret.y, WALL_H + 10, S.H - 4); S.ferret.target = null; S.ferret.chase = null; S.ferret.carry = null; }
-      S.mice.forEach((m, i) => { m.hide = S.hides[i]; m.hidden = true; m.path = []; m.until = S.now + rnd(3, 10); });
+      S.mice.forEach((m, i) => { m.hide = S.hides[i]; m.hidden = true; m.path = []; m.until = S.now + rnd(10, 25) + i * 20; });
     }
     S.notes = list.filter((x) => x.id !== 'hermes').map((x) => ({
       color: x.working ? '#b5ec8a' : x.paused ? '#d9d2c0' : x.error ? '#f4a09a' : '#fbe9a0',
@@ -1433,7 +1433,7 @@
       { y: S.counter.base, draw: drawCounter },
       { y: S.LT + 34, draw: () => drawMarigoldPot(64, S.LT + 34) },
       { y: S.dog.y, draw: () => paintDog(S.dog, Math.round(S.dog.x), Math.round(S.dog.y), t) },
-      { y: S.stash.y - 1, draw: drawStash },
+      { y: S.couch.y + 23, draw: drawStash }, // just before the couch, so the couch covers it
     ];
     if (!S.ferret.hidden) drawables.push({ y: S.ferret.y, draw: () => paintFerret(S.ferret, Math.round(S.ferret.x), Math.round(S.ferret.y), t) });
     for (const m of S.mice) {
@@ -1500,7 +1500,7 @@
       { id: 'mouse-white', fur: '#f4f2ec', belly: '#d8d4ca', ear: '#f3a0b0', eye: '#c0304a', tail: '#eba5ae' },
       { id: 'mouse-black', fur: '#2e2e34', belly: '#1c1c20', ear: '#9a7078', eye: '#e8e8e8', tail: '#8a6a70' },
     ].map((m, i) => Object.assign(m, {
-      hide: S.hides[i], x: S.hides[i].x, y: S.hides[i].y, dir: 1, hidden: true, until: rnd(3, 8) + i * 5,
+      hide: S.hides[i], x: S.hides[i].x, y: S.hides[i].y, dir: 1, hidden: true, until: rnd(10, 25) + i * 20,
       path: [], pauseUntil: 0, speed: 44, moving: false, fleeing: false,
     }));
     new ResizeObserver(resize).observe(S.wrap);

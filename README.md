@@ -5,9 +5,10 @@ You chat with Hermes, and a pixel-art office shows every scheduled (cron) agent 
 they sit and type while their job runs, wander, drink coffee, play the arcade or nap on the
 couch when idle, sleep when paused, and drop their work in the shipping bin when a run finishes.
 A spotted office dog follows people around, and there are marigolds in the window boxes.
-Two mice (white and black) hide in baseboard holes and under the furniture, dash out now and then,
-and bolt when the dog or ferret comes near. The ferret steals socks for its stash, does war dances,
-hides in the shipping bin and cuddles everyone. The wall clock, sky and HUD run on California time.
+Two mice (white and black) hide in a baseboard hole and under the furniture, dash out every minute
+or so, and bolt when the dog or ferret comes near. The ferret steals socks for a stash under the
+couch, does war dances, hides in the shipping bin and cuddles everyone. The animals spend most of
+their time resting. The wall clock, sky and HUD run on California time.
 
 - Tap an agent to see its schedule, level and last report, run or pause it, or **customize** it:
   nickname, male or female body, hair or hat, shirt (T-shirt, stripes, hoodie, vest, shirt & tie,
